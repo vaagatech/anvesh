@@ -1,6 +1,6 @@
 {
   "name": "@vaagatech/anvesh-setup",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Anvesh easy setup — scaffold local stack and print run commands — by VaagaTech",
   "type": "module",
   "bin": {

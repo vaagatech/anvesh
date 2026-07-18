@@ -1,6 +1,6 @@
 {
   "name": "@vaagatech/anvesh-engine",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Anvesh search engine API — full-text, semantic, geo — by VaagaTech",
   "type": "module",
   "main": "./dist/index.js",

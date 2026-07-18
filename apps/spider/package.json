@@ -1,6 +1,6 @@
 {
   "name": "@vaagatech/anvesh-spider",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Anvesh site spider — full-site crawl with role-based post-login discovery — by VaagaTech",
   "type": "module",
   "bin": {
@@ -30,7 +30,7 @@
     "examples"
   ],
   "dependencies": {
-    "@vaagatech/anvesh-shared": "0.1.0",
+    "@vaagatech/anvesh-shared": "0.2.0",
     "linkedom": "^0.18.9",
     "pino": "^9.6.0",
     "pino-pretty": "^13.0.0",

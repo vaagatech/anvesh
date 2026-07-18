@@ -1,6 +1,6 @@
 {
   "name": "@vaagatech/anvesh-hub",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Anvesh Hub — control plane with RBAC for engine, indexer, and spider instances — by VaagaTech",
   "type": "module",
   "bin": {
