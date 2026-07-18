@@ -106,10 +106,11 @@ export async function createHubServer(options?: {
   }
 
   app.setErrorHandler((err, _req, reply) => {
-    const status = (err as Error & { statusCode?: number }).statusCode ?? 500;
+    const e = err as Error & { statusCode?: number };
+    const status = e.statusCode ?? 500;
     reply.status(status).send({
       ok: false,
-      message: err.message || "Something went wrong on the Hub.",
+      message: e.message || "Something went wrong on the Hub.",
     });
   });
 

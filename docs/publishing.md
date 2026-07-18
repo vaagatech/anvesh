@@ -1,11 +1,11 @@
 ---
 title: Publish to npm
 section: Ship
-description: Publish shared, engine, indexer, and spider under the @vaagatech scope.
+description: Publish all Anvesh packages including Hub and Setup under @vaagatech.
 permalink: /publishing/
 ---
 
-The monorepo root and Hub are **private** and are not published.
+The monorepo root is **private**. All apps below are published.
 
 ## Packages
 
@@ -15,41 +15,33 @@ The monorepo root and Hub are **private** and are not published.
 | Engine | `@vaagatech/anvesh-engine` |
 | Indexer | `@vaagatech/anvesh-indexer` |
 | Spider | `@vaagatech/anvesh-spider` |
+| Hub | `@vaagatech/anvesh-hub` |
+| Setup | `@vaagatech/anvesh-setup` |
 
-Publish order: **shared → engine → indexer → spider**.
+Order: **shared → engine → indexer → spider → hub → setup**.
 
-## Steps
+## GitHub Actions
+
+Workflow: `.github/workflows/publish.yml`
+
+- Triggers: `workflow_dispatch` and GitHub Release published
+- Requires repo secret **`NPM_TOKEN`** (classic or granular publish token for `@vaagatech`)
+- Uses OIDC permission `id-token: write` so you can later switch to npm Trusted Publishing
+
+## Manual publish
 
 ```bash
 npm login
 npm install
 npm test
 npm run build
-
-npm run publish:dry        # preview
-npm run publish:packages   # real publish
-```
-
-Or per package:
-
-```bash
-npm publish -w @vaagatech/anvesh-shared --access public
-npm publish -w @vaagatech/anvesh-engine --access public
-npm publish -w @vaagatech/anvesh-indexer --access public
-npm publish -w @vaagatech/anvesh-spider --access public
+npm run publish:dry
+npm run publish:packages
 ```
 
 ## Afterward
 
 ```bash
-npm install @vaagatech/anvesh-engine
-npm install -g @vaagatech/anvesh-spider @vaagatech/anvesh-indexer
+npm install -g @vaagatech/anvesh-setup @vaagatech/anvesh-hub
+anvesh-setup init
 ```
-
-Bump versions before republishing — npm rejects duplicate versions.
-
-Recommended sequence for open source launch:
-
-1. Enable [GitHub Pages]({{ '/github-pages/' | relative_url }}) (this site)
-2. Publish npm packages
-3. Point README badges at the Pages URL

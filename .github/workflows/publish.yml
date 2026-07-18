@@ -1,0 +1,42 @@
+name: Publish npm packages
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Publish packages (order matters)
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -e
+          npm publish -w @vaagatech/anvesh-shared --access public
+          npm publish -w @vaagatech/anvesh-engine --access public
+          npm publish -w @vaagatech/anvesh-indexer --access public
+          npm publish -w @vaagatech/anvesh-spider --access public
+          npm publish -w @vaagatech/anvesh-hub --access public
+          npm publish -w @vaagatech/anvesh-setup --access public

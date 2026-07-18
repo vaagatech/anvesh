@@ -1,58 +1,62 @@
 ---
 title: Hub
 section: Components
-description: Optional management UI for indexes, documents, and search trials.
+description: Publishable control plane with RBAC over engines, indexes, spiders, and indexers.
 permalink: /components/hub/
 ---
 
 ## Purpose
 
-**Hub** is an optional React UI to connect to a running engine, create indexes, ingest a sample document, and run keyword search. Anvesh works fully without Hub.
+**Hub** (`@vaagatech/anvesh-hub`) is the optional but powerful control plane for Anvesh. When configured, it is the place to:
 
-Path: `apps/hub` · **Not published to npm** (`private: true`)
+- Register **multiple instances** of engine, indexer, and spider
+- Create and manage **indexes** (and mappings) on any engine
+- Store and run **spider** configurations (including post-login roles)
+- Store and run **indexer** configurations
+- Administer users with **RBAC** (`admin`, `operator`, `viewer`)
+- Try **search** against a selected engine
 
-## When to use it
+The engine, spider, and indexer remain standalone apps. Hub orchestrates them over HTTP.
 
-- Local demos and operator tooling
-- Exploring indexes without curling the API
+## Roles
 
-## When not to use it
+| Role | Capabilities |
+|------|----------------|
+| `admin` | Everything, including user management and instance registration |
+| `operator` | Indexes, spider/indexer configs & runs, search; read instances |
+| `viewer` | Read instances/indexes and run search |
 
-- Production admin without your own auth gateway (Hub stores API key in `localStorage`)
-- Headless / CI environments
+## Ports
 
-## Run locally
+| App | Default port |
+|-----|--------------|
+| Engine | 3848 |
+| Hub | 3849 |
+| Spider worker | 3851 (`anvesh-spider serve`) |
+| Indexer worker | 3852 (`anvesh-indexer serve`) |
 
-```bash
-# terminal 1
-npm run dev:engine
+## Bootstrap
 
-# terminal 2
-npm run dev:hub
-# → http://127.0.0.1:3849
-```
-
-Vite proxies `/v1` and `/health` to `http://127.0.0.1:3848`. You can also set a remote API base URL in the Connect form.
-
-## Features
-
-| Area | Behavior |
-|------|----------|
-| Connect | API base + optional API key |
-| Indexes | List, create (default text mappings + vector dims), delete |
-| Documents | Paste JSON and index into selected index |
-| Search | Keyword query; shows score + fields |
-| A11y | Skip link, live regions, focus styles, reduced motion |
-
-## Design notes
-
-Brand-first landing (product name **Anvesh**), moss/green palette, Fraunces + DM Sans. Hub is a thin client — all durability lives in the engine.
-
-## Build static assets
+First start creates an admin user:
 
 ```bash
-npm run build -w @vaagatech/anvesh-hub
-# output: apps/hub/dist
+ANVESH_HUB_ADMIN_USER=admin
+ANVESH_HUB_ADMIN_PASSWORD=change-me
+anvesh-hub
 ```
 
-Serve `apps/hub/dist` behind any static host, pointed at your engine URL.
+Or use `anvesh-setup init` which writes `.env.anvesh` with a generated password.
+
+## Typical flow
+
+1. `anvesh-setup init`
+2. Start engine, hub, spider serve, indexer serve
+3. Sign in to Hub
+4. Register instance URLs
+5. Create indexes on an engine
+6. Save spider/indexer configs and run jobs
+7. Search
+
+## Publish
+
+Hub is published to npm with the other packages via GitHub Actions (`.github/workflows/publish.yml`) or `npm run publish:packages`.

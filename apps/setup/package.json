@@ -1,0 +1,32 @@
+{
+  "name": "@vaagatech/anvesh-setup",
+  "version": "0.1.0",
+  "description": "Anvesh easy setup — scaffold local stack and print run commands — by VaagaTech",
+  "type": "module",
+  "bin": {
+    "anvesh-setup": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx src/cli.ts",
+    "start": "node dist/cli.js",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "author": "VaagaTech <info@vaagatech.com>",
+  "license": "MIT",
+  "homepage": "https://www.vaagatech.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vaagatech/anvesh.git",
+    "directory": "apps/setup"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": ["dist", "README.md"],
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}

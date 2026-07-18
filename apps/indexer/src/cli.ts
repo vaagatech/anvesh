@@ -41,6 +41,7 @@ function usage(): never {
   console.log(`Anvesh Indexer — by VaagaTech
 
 Usage:
+  anvesh-indexer serve                 HTTP worker for Hub (port 3852)
   anvesh-indexer --index <name> --input <file-or-dir.jsonl|json>
 
 Options:
@@ -214,6 +215,12 @@ async function indexLocal(
 }
 
 async function main(): Promise<void> {
+  if (process.argv[2] === "serve") {
+    const { startIndexerServer } = await import("./serve.js");
+    startIndexerServer();
+    return;
+  }
+
   const args = parseArgs(process.argv.slice(2));
   if (!args.index || !args.input) usage();
 

@@ -20,11 +20,9 @@ function usage(): never {
   console.log(`Anvesh Spider — full-site crawl with role-based auth — by VaagaTech
 
 Usage:
-  anvesh-spider --config <spider.config.json>
+  anvesh-spider serve                 HTTP worker for Hub (port 3851)
+  anvesh-spider --config <file.json>
   anvesh-spider --seed <url> [--out crawl.jsonl] [--max-pages 200]
-
-Config file supports multiple roles (guest, user, admin, …) with form login
-or cookie/header sessions so post-login pages are discovered per role.
 
 Example config: apps/spider/examples/spider.config.example.json
 `);
@@ -44,6 +42,12 @@ function parseArgs(argv: string[]) {
 }
 
 async function main(): Promise<void> {
+  if (process.argv[2] === "serve") {
+    const { startSpiderServer } = await import("./serve.js");
+    startSpiderServer();
+    return;
+  }
+
   const args = parseArgs(process.argv.slice(2));
   let raw: unknown;
 
