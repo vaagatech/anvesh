@@ -1,0 +1,5 @@
+source "https://rubygems.org"
+
+# Optional — local preview of GitHub Pages (not required for publishing the site).
+# gem install bundler && bundle install && bundle exec jekyll serve --baseurl /anvesh
+gem "github-pages", group: :jekyll_plugins

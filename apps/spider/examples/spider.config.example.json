@@ -1,0 +1,59 @@
+{
+  "seeds": ["https://example.com/"],
+  "maxPages": 200,
+  "maxDepth": 6,
+  "concurrency": 3,
+  "delayMs": 300,
+  "respectRobotsTxt": true,
+  "followSitemaps": true,
+  "indexName": "web",
+  "outputPath": "./.anvesh/crawl/example.jsonl",
+  "roles": [
+    {
+      "name": "guest",
+      "anonymous": true
+    },
+    {
+      "name": "user",
+      "login": {
+        "url": "https://example.com/login",
+        "method": "POST",
+        "contentType": "application/x-www-form-urlencoded",
+        "body": {
+          "email": "{{username}}",
+          "password": "{{password}}"
+        },
+        "username": "user@example.com",
+        "password": "replace-me"
+      }
+    },
+    {
+      "name": "admin",
+      "login": {
+        "url": "https://example.com/login",
+        "method": "POST",
+        "contentType": "application/x-www-form-urlencoded",
+        "body": {
+          "email": "{{username}}",
+          "password": "{{password}}"
+        },
+        "username": "admin@example.com",
+        "password": "replace-me"
+      },
+      "headers": {
+        "x-requested-with": "XMLHttpRequest"
+      }
+    },
+    {
+      "name": "service",
+      "headers": {
+        "authorization": "Bearer replace-with-token"
+      }
+    }
+  ],
+  "denyPathPatterns": [
+    "/logout",
+    "/api/auth",
+    "\\.(pdf|zip|png|jpe?g|gif|css|js)$"
+  ]
+}

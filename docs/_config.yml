@@ -1,0 +1,27 @@
+# Anvesh documentation site (GitHub Pages)
+title: Anvesh Docs
+description: Lightweight search engine — engine, hub, indexer, spider — by VaagaTech
+url: "https://vaagatech.github.io"
+baseurl: "/anvesh"
+
+author:
+  name: VaagaTech
+  email: info@vaagatech.com
+  url: https://www.vaagatech.com
+
+repository: vaagatech/anvesh
+license: MIT
+
+markdown: kramdown
+highlighter: rouge
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - README.md
+  - vendor
+
+defaults:
+  - scope:
+      path: ""
+    values:
+      layout: default

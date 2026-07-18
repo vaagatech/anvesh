@@ -1,0 +1,18 @@
+# Local Compose — optional. Prefer: npm run dev:engine
+services:
+  anvesh-engine:
+    build: .
+    image: anvesh-engine:0.1.0
+    ports:
+      - "3848:3848"
+    environment:
+      ANVESH_STORAGE: ${ANVESH_STORAGE:-filesystem}
+      ANVESH_DATA_DIR: /data
+      ANVESH_API_KEY: ${ANVESH_API_KEY:-}
+      ANVESH_LOG_PRETTY: "0"
+    volumes:
+      - anvesh-data:/data
+    restart: unless-stopped
+
+volumes:
+  anvesh-data:

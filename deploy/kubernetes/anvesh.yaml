@@ -1,0 +1,205 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: anvesh
+  labels:
+    app.kubernetes.io/part-of: anvesh
+    app.kubernetes.io/vendor: vaagatech
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: anvesh-config
+  namespace: anvesh
+data:
+  ANVESH_STORAGE: "redis"
+  ANVESH_PORT: "3848"
+  ANVESH_LOG_PRETTY: "0"
+  ANVESH_CORS_ORIGIN: "*"
+  ANVESH_RATE_LIMIT: "120"
+  # Point at your Redis Service / ElastiCache endpoint
+  REDIS_URL: "redis://anvesh-redis:6379"
+---
+# Create the secret out-of-band in production (External Secrets / Sealed Secrets).
+# kubectl create secret generic anvesh-secrets -n anvesh --from-literal=ANVESH_API_KEY=change-me
+apiVersion: v1
+kind: Secret
+metadata:
+  name: anvesh-secrets
+  namespace: anvesh
+type: Opaque
+stringData:
+  ANVESH_API_KEY: "change-me-in-production"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: anvesh
+  namespace: anvesh
+  labels:
+    app.kubernetes.io/name: anvesh
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: anvesh
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: anvesh
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: anvesh
+          image: anvesh:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3848
+          envFrom:
+            - configMapRef:
+                name: anvesh-config
+            - secretRef:
+                name: anvesh-secrets
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: anvesh
+  namespace: anvesh
+  labels:
+    app.kubernetes.io/name: anvesh
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: anvesh
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: anvesh
+  namespace: anvesh
+  annotations:
+    # Replace with your ingress controller annotations (ALB, nginx, traefik).
+    kubernetes.io/ingress.class: nginx
+spec:
+  rules:
+    - host: anvesh.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: anvesh
+                port:
+                  name: http
+---
+# Optional in-cluster Redis for demos. Prefer managed Redis/ElastiCache in production.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: anvesh-redis
+  namespace: anvesh
+  labels:
+    app.kubernetes.io/name: anvesh-redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: anvesh-redis
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: anvesh-redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: anvesh-redis
+  namespace: anvesh
+spec:
+  selector:
+    app.kubernetes.io/name: anvesh-redis
+  ports:
+    - port: 6379
+      targetPort: 6379
+---
+# Optional bulk indexing Job — same image, different command.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: anvesh-index-bulk
+  namespace: anvesh
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: indexer
+          image: anvesh:0.1.0
+          command: ["node", "dist/cli.js", "index-file", "articles", "/data/bulk.json"]
+          envFrom:
+            - configMapRef:
+                name: anvesh-config
+            - secretRef:
+                name: anvesh-secrets
+          volumeMounts:
+            - name: bulk
+              mountPath: /data
+              readOnly: true
+      volumes:
+        - name: bulk
+          configMap:
+            name: anvesh-bulk-docs
+            optional: true

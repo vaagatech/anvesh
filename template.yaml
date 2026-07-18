@@ -1,0 +1,69 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Optional example — Anvesh on Lambda + S3. Prefer containers (ECS/EKS) for primary deployments. See deploy/README.md.
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 512
+    Runtime: nodejs20.x
+    Architectures: [arm64]
+
+Parameters:
+  ApiKey:
+    Type: String
+    NoEcho: true
+    Default: ""
+  BucketName:
+    Type: String
+    Default: ""
+
+Conditions:
+  HasBucket: !Not [!Equals [!Ref BucketName, ""]]
+
+Resources:
+  IndexBucket:
+    Type: AWS::S3::Bucket
+    Condition: HasBucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  AnveshFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: apps/engine/dist/api/lambda.handler
+      CodeUri: .
+      Environment:
+        Variables:
+          ANVESH_STORAGE: s3
+          ANVESH_S3_BUCKET: !If [HasBucket, !Ref IndexBucket, !Ref BucketName]
+          ANVESH_S3_PREFIX: anvesh/indexes/
+          ANVESH_API_KEY: !Ref ApiKey
+          ANVESH_LOG_PRETTY: "0"
+      Policies:
+        - S3CrudPolicy:
+            BucketName: !If [HasBucket, !Ref IndexBucket, !Ref BucketName]
+      Events:
+        HttpApi:
+          Type: HttpApi
+          Properties:
+            Path: /{proxy+}
+            Method: ANY
+        Health:
+          Type: HttpApi
+          Properties:
+            Path: /health
+            Method: GET
+
+Outputs:
+  ApiUrl:
+    Description: Anvesh HTTP API endpoint
+    Value: !Sub "https://${ServerlessHttpApi}.execute-api.${AWS::Region}.amazonaws.com"

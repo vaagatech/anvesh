@@ -1,0 +1,33 @@
+{
+  "serviceName": "anvesh",
+  "cluster": "anvesh-cluster",
+  "taskDefinition": "anvesh",
+  "desiredCount": 2,
+  "launchType": "FARGATE",
+  "platformVersion": "LATEST",
+  "networkConfiguration": {
+    "awsvpcConfiguration": {
+      "subnets": ["subnet-aaaa", "subnet-bbbb"],
+      "securityGroups": ["sg-anvesh"],
+      "assignPublicIp": "DISABLED"
+    }
+  },
+  "loadBalancers": [
+    {
+      "targetGroupArn": "arn:aws:elasticloadbalancing:REGION:ACCOUNT_ID:targetgroup/anvesh/xxxx",
+      "containerName": "anvesh",
+      "containerPort": 3848
+    }
+  ],
+  "healthCheckGracePeriodSeconds": 60,
+  "deploymentConfiguration": {
+    "maximumPercent": 200,
+    "minimumHealthyPercent": 100
+  },
+  "enableExecuteCommand": false,
+  "propagateTags": "SERVICE",
+  "tags": [
+    { "key": "Product", "value": "Anvesh" },
+    { "key": "Vendor", "value": "VaagaTech" }
+  ]
+}

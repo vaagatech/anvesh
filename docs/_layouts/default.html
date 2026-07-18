@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% if page.title %}{{ page.title }} · {% endif %}{{ site.title }}</title>
+  <meta name="description" content="{{ page.description | default: site.description }}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Fraunces:opsz,wght@9..144,500;9..144,700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ '/assets/css/site.css' | relative_url }}" />
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="shell">
+    <aside class="sidebar" aria-label="Documentation">
+      <a class="brand" href="{{ '/' | relative_url }}">Anvesh</a>
+      <p class="brand-sub">Docs · <a href="https://www.vaagatech.com">VaagaTech</a></p>
+      <nav>
+        <p class="nav-label">Start</p>
+        <ul>
+          <li><a href="{{ '/' | relative_url }}">Overview</a></li>
+          <li><a href="{{ '/getting-started/' | relative_url }}">Getting started</a></li>
+          <li><a href="{{ '/architecture/' | relative_url }}">Architecture</a></li>
+        </ul>
+        <p class="nav-label">Components</p>
+        <ul>
+          <li><a href="{{ '/components/' | relative_url }}">All components</a></li>
+          <li><a href="{{ '/components/engine/' | relative_url }}">Engine</a></li>
+          <li><a href="{{ '/components/hub/' | relative_url }}">Hub</a></li>
+          <li><a href="{{ '/components/indexer/' | relative_url }}">Indexer</a></li>
+          <li><a href="{{ '/components/spider/' | relative_url }}">Spider</a></li>
+          <li><a href="{{ '/components/shared/' | relative_url }}">Shared</a></li>
+        </ul>
+        <p class="nav-label">Guides</p>
+        <ul>
+          <li><a href="{{ '/guides/search/' | relative_url }}">Search modes</a></li>
+          <li><a href="{{ '/guides/geo/' | relative_url }}">Geo search</a></li>
+          <li><a href="{{ '/guides/storage/' | relative_url }}">Storage</a></li>
+          <li><a href="{{ '/guides/crawling/' | relative_url }}">Crawling &amp; roles</a></li>
+          <li><a href="{{ '/guides/indexing/' | relative_url }}">Indexing pipeline</a></li>
+          <li><a href="{{ '/api/http/' | relative_url }}">HTTP API</a></li>
+          <li><a href="{{ '/api/library/' | relative_url }}">Library API</a></li>
+        </ul>
+        <p class="nav-label">Ship</p>
+        <ul>
+          <li><a href="{{ '/deploy/' | relative_url }}">Deploy</a></li>
+          <li><a href="{{ '/publishing/' | relative_url }}">Publish to npm</a></li>
+          <li><a href="{{ '/github-pages/' | relative_url }}">GitHub Pages setup</a></li>
+        </ul>
+      </nav>
+    </aside>
+    <div class="content">
+      <header class="top">
+        <p class="eyebrow">{{ page.section | default: "Documentation" }}</p>
+        <h1>{{ page.title }}</h1>
+        {% if page.description %}<p class="lede">{{ page.description }}</p>{% endif %}
+      </header>
+      <main id="main" class="prose">
+        {{ content }}
+      </main>
+      <footer class="foot">
+        <p>MIT · <a href="https://www.vaagatech.com">VaagaTech</a> · <a href="https://github.com/vaagatech/anvesh">GitHub</a></p>
+      </footer>
+    </div>
+  </div>
+</body>
+</html>
