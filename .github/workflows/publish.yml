@@ -1,24 +1,44 @@
 name: Publish npm packages
 
+# Publish only from semver tags: vX.Y.Z (1–3 digits per part).
 on:
-  workflow_dispatch:
-  release:
-    types: [published]
+  push:
+    tags:
+      - "v*.*.*"
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
+      - name: Validate tag format
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          if [[ ! "$TAG" =~ ^v[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+            echo "Refusing to publish: tag must match v\\d{1,3}.\\d{1,3}.\\d{1,3} (got: $TAG)"
+            exit 1
+          fi
+          echo "Publishing tag $TAG"
+
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "26"
           registry-url: "https://registry.npmjs.org"
+          check-latest: true
+
+      - name: Use latest npm
+        run: npm install -g npm@latest && node -v && npm -v
+
+      - name: Verify package versions match tag
+        run: node scripts/version.mjs from-tag "${{ github.ref_name }}"
 
       - name: Install
         run: npm ci
@@ -40,3 +60,30 @@ jobs:
           npm publish -w @vaagatech/anvesh-spider --access public
           npm publish -w @vaagatech/anvesh-hub --access public
           npm publish -w @vaagatech/anvesh-setup --access public
+
+      - name: Bump next minor on main
+        env:
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: |
+          set -e
+          PUBLISHED="${GITHUB_REF_NAME#v}"
+          git fetch origin main
+          git checkout main
+          git pull --ff-only origin main
+
+          # Ensure main is at least at the published version, then bump minor.
+          node scripts/version.mjs set "$PUBLISHED"
+          node scripts/version.mjs bump minor
+          NEXT="$(node -p "require('./package.json').version")"
+
+          git add package.json apps/*/package.json packages/*/package.json
+          if git diff --cached --quiet; then
+            echo "No version changes to commit (main already at ${NEXT})."
+            exit 0
+          fi
+          git commit -m "chore: bump version to ${NEXT} after publishing v${PUBLISHED}"
+          git push origin main
+          echo "Main now at ${NEXT} (ready for next release)."

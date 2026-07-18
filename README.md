@@ -46,10 +46,13 @@ When configured, Hub manages:
 ## Publish (GitHub Actions)
 
 1. Add repo secret `NPM_TOKEN`
-2. Create a GitHub Release **or** run workflow **Publish npm packages** manually
-3. Packages publish in dependency order (includes Hub + Setup)
-
-Manual: `npm run publish:packages`
+2. On `main`, set the version you want to ship (all packages stay in sync):
+   ```bash
+   npm run version:set -- 0.1.0
+   npm run release -- --push   # commit + tag v0.1.0 + push
+   ```
+3. Tag `vX.Y.Z` triggers publish; then CI bumps **next minor** on `main` (e.g. `0.2.0`)
+4. Pushes to `main` only run a **snapshot** build (test + build, no npm publish)
 
 ## License
 
