@@ -20,7 +20,7 @@
   "homepage": "https://www.vaagatech.com",
   "repository": {
     "type": "git",
-    "url": "https://github.com/vaagatech/anvesh.git",
+    "url": "https://github.com/vaagatech/anvesh-monorepo.git",
     "directory": "packages/shared"
   },
   "publishConfig": {

@@ -13,16 +13,18 @@ permalink: /getting-started/
 ## Install & build
 
 ```bash
-git clone https://github.com/vaagatech/anvesh.git
-cd anvesh
+git clone https://github.com/vaagatech/anvesh-monorepo.git
+cd anvesh-monorepo
 npm install
 npm run build
+npm run setup -- init
 ```
 
 ## Start the engine
 
 ```bash
-npm run dev:engine
+set -a; source .env.anvesh; set +a
+npm run start:engine
 # → http://127.0.0.1:3848/health
 ```
 
@@ -66,11 +68,12 @@ Successful responses include a human-readable `message`, e.g.
 ## Optional Hub
 
 ```bash
-npm run dev:hub
+npm run start -w @vaagatech/anvesh-hub
 # → http://127.0.0.1:3849
+# login: admin / (see ANVESH_HUB_ADMIN_PASSWORD in .env.anvesh)
 ```
 
-Leave API base blank in Hub to use the Vite proxy to `:3848`.
+Register engine/spider/indexer instance URLs in Hub to manage indexes and jobs.
 
 ## Crawl a site, then index
 

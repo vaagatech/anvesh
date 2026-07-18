@@ -7,9 +7,9 @@ permalink: /github-pages/
 
 This documentation site is static Jekyll content under `/docs`. GitHub builds it for you when Pages is enabled — **you do not need GitHub Actions**.
 
-## Enable Pages (before or after publishing npm)
+## Enable Pages
 
-1. Push this repository to GitHub (e.g. `vaagatech/anvesh`).
+1. Push this repository to GitHub (`vaagatech/anvesh-monorepo`).
 2. Open **Settings → Pages**.
 3. Under **Build and deployment**:
    - **Source:** Deploy from a branch
@@ -19,32 +19,34 @@ This documentation site is static Jekyll content under `/docs`. GitHub builds it
 
 GitHub will run its built-in Jekyll build on `/docs` and publish the site.
 
-## Expected URL
-
-For a project site under the `vaagatech` org/user:
+## Live URL
 
 ```
-https://vaagatech.github.io/anvesh/
+https://vaagatech.github.io/anvesh-monorepo/
 ```
 
-`docs/_config.yml` already sets:
+`docs/_config.yml` must match the **repository name**:
 
 ```yaml
 url: "https://vaagatech.github.io"
-baseurl: "/anvesh"
+baseurl: "/anvesh-monorepo"
 ```
 
-If your repo name differs, change `baseurl` to `/<repo-name>` and update `url` if needed.
+If you rename the repo, change `baseurl` to `/<repo-name>` or nav links and CSS will 404.
+
+## Common breakage
+
+| Symptom | Cause |
+|---------|--------|
+| Unstyled page / broken nav | `baseurl` does not match the GitHub Pages path |
+| `/anvesh/...` 404s | Old baseurl; site is under `/anvesh-monorepo/` |
 
 ## Verify locally (optional)
 
 ```bash
 # from docs/, if you have Bundler + jekyll
-# gem install bundler jekyll
-# bundle exec jekyll serve --baseurl /anvesh
+bundle exec jekyll serve --baseurl /anvesh-monorepo
 ```
-
-Or simply open markdown in the repo — GitHub Pages will render with the custom layout once enabled.
 
 ## What is included
 
@@ -53,21 +55,15 @@ Or simply open markdown in the repo — GitHub Pages will render with the custom
 | `docs/index.md` | Overview |
 | `docs/getting-started.md` | Local quickstart |
 | `docs/architecture.md` | Collective design |
-| `docs/components/*` | Engine, Hub, Indexer, Spider, Shared |
+| `docs/components/*` | Engine, Hub, Indexer, Spider, Shared, Setup |
 | `docs/guides/*` | Search, geo, storage, crawl, indexing |
 | `docs/api/*` | HTTP + library |
 | `docs/deploy.md` | Deploy options |
 | `docs/publishing.md` | npm publish |
 | `docs/_layouts` + `assets/css` | Site chrome |
 
-## No CI
-
-Do **not** add a Pages workflow unless you want one later. Branch + `/docs` is enough.
-
 ## After it is live
 
-Add a badge to the root README:
-
 ```markdown
-[![docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://vaagatech.github.io/anvesh/)
+[![docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://vaagatech.github.io/anvesh-monorepo/)
 ```

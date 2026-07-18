@@ -2,14 +2,14 @@
 title: Anvesh Docs
 description: Lightweight search engine — engine, hub, indexer, spider — by VaagaTech
 url: "https://vaagatech.github.io"
-baseurl: "/anvesh"
+baseurl: "/anvesh-monorepo"
 
 author:
   name: VaagaTech
   email: info@vaagatech.com
   url: https://www.vaagatech.com
 
-repository: vaagatech/anvesh
+repository: vaagatech/anvesh-monorepo
 license: MIT
 
 markdown: kramdown

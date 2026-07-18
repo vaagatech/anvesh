@@ -19,9 +19,10 @@ permalink: /
 | Piece | npm / path | Role |
 |-------|------------|------|
 | **Engine** | `@vaagatech/anvesh-engine` · `apps/engine` | Search API + library (BM25, vectors, hybrid, geo) |
-| **Hub** | `apps/hub` (not published) | Optional management UI |
+| **Hub** | `@vaagatech/anvesh-hub` · `apps/hub` | Control plane UI with RBAC over instances & indexes |
 | **Indexer** | `@vaagatech/anvesh-indexer` · `apps/indexer` | Bulk load JSON/JSONL into the engine |
 | **Spider** | `@vaagatech/anvesh-spider` · `apps/spider` | Full-site crawl with role-based post-login discovery |
+| **Setup** | `@vaagatech/anvesh-setup` · `apps/setup` | Easy local installer / scaffold |
 | **Shared** | `@vaagatech/anvesh-shared` · `packages/shared` | Crawl/index contracts used by spider & indexer |
 
 ## Collective flow
@@ -43,7 +44,7 @@ permalink: /
 1. **Spider** discovers pages (anonymous and authenticated roles).
 2. **Indexer** bulk-writes documents into an index.
 3. **Engine** serves keyword, semantic, hybrid, and geo search.
-4. **Hub** is optional — the API works without it.
+4. **Hub** is optional for search, but when configured it is the control plane for instances, indexes, spider/indexer jobs, and RBAC.
 
 ## Design principles
 

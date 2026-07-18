@@ -1,12 +1,12 @@
 # Anvesh
 
-[![docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://vaagatech.github.io/anvesh/)
+[![docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://vaagatech.github.io/anvesh-monorepo/)
 [![license](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
 
 **Lightweight search stack in Node.js** — engine, hub (RBAC control plane), indexer, spider, and setup — by [VaagaTech](https://www.vaagatech.com).
 
-**Docs:** [vaagatech.github.io/anvesh](https://vaagatech.github.io/anvesh/) · enable Pages from `/docs` ([guide](./docs/github-pages.md))
+**Docs:** [vaagatech.github.io/anvesh-monorepo](https://vaagatech.github.io/anvesh-monorepo/) · enable Pages from `/docs` ([guide](./docs/github-pages.md))
 
 | Package | Role |
 |---------|------|
