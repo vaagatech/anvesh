@@ -30,11 +30,11 @@ jobs:
       - name: Install
         run: npm ci
 
+      - name: Build packages
+        run: npm run build
+
       - name: Test
         run: npm test
-
-      - name: Build snapshot
-        run: npm run build
 
       - name: Snapshot summary
         run: |

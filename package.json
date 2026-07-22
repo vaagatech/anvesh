@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "build": "npm run build -w @vaagatech/anvesh-shared && npm run build -w @vaagatech/anvesh-plugins && npm run build -w @vaagatech/vaakly && npm run build -w @vaagatech/anvesh-search-adapters && npm run build -w @vaagatech/anvesh-engine && npm run build -w @vaagatech/anvesh-indexer && npm run build -w @vaagatech/anvesh-spider && npm run build -w @vaagatech/anvesh-hub && npm run build -w @vaagatech/anvesh-setup",
-    "test": "npm run test -w @vaagatech/anvesh-plugins && npm run test -w @vaagatech/vaakly && npm run test -w @vaagatech/anvesh-search-adapters && npm run test -w @vaagatech/anvesh-engine && npm run test -w @vaagatech/anvesh-spider && npm run test -w @vaagatech/anvesh-hub",
+    "test": "npm run build -w @vaagatech/anvesh-plugins && npm run build -w @vaagatech/vaakly && npm run test -w @vaagatech/anvesh-plugins && npm run test -w @vaagatech/vaakly && npm run test -w @vaagatech/anvesh-search-adapters && npm run test -w @vaagatech/anvesh-engine && npm run test -w @vaagatech/anvesh-spider && npm run test -w @vaagatech/anvesh-hub",
     "test:e2e": "npm run build && vitest run --config e2e/vitest.config.ts",
     "lint": "npm run lint --workspaces --if-present",
     "dev:engine": "npm run dev -w @vaagatech/anvesh-engine",
