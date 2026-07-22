@@ -43,7 +43,8 @@ npm run start:engine
 | Engine | `src/core/engine.ts` | Orchestration, flush, search modes |
 | Storage | `src/storage/*` | memory, filesystem, S3, Redis, DynamoDB, MongoDB |
 | API | `src/api/server.ts` | HTTP routes, auth, rate limit, messages |
-| Messaging | `src/messaging/vaakly.ts` | User messages + log templates |
+| Messaging | `@vaagatech/vaakly` · `packages/vaakly` | Corrected API summaries; default engine plugin |
+| Plugins | `@vaagatech/anvesh-plugins` · `packages/plugins` | LLM-tool-style registry |
 | Lambda | `src/api/lambda.ts` | Optional API Gateway inject adapter |
 
 ## Field types

@@ -34,6 +34,95 @@ Mode is auto-detected when omitted:
 }
 ```
 
+## Fuzzy, phrase, and prefix
+
+Typos and match styles map to Elasticsearch-like options:
+
+| Option | Effect |
+|--------|--------|
+| `fuzziness: "AUTO"` | ES-style AUTO: 0 edits for ≤2 chars, 1 for ≤5, else 2 |
+| `fuzziness: 0 \| 1 \| 2` | Fixed edit distance |
+| `phrase: true` | Ordered term match |
+| `phraseSlop: 2` | Allowed gaps between phrase terms (0–10) |
+| `prefix: true` | Prefix match each query token |
+
+```json
+{
+  "q": "lightweght serch",
+  "fuzziness": "AUTO",
+  "fields": ["title", "body"]
+}
+```
+
+```json
+{
+  "q": "control plane",
+  "phrase": true,
+  "phraseSlop": 1
+}
+```
+
+Query tokens may use trailing `*` or single-char `?` wildcards at the term level.
+
+Fuzzy expansion is capped by the circuit breaker (`ANVESH_MAX_FUZZY_CANDIDATES`); oversize requests return header `x-anvesh-fuzzy-capped: 1`.
+
+## Field boosts and bool subset
+
+Per-field score multipliers:
+
+```json
+{ "q": "anvesh hub", "fields": ["title", "body"], "boosts": { "title": 3 } }
+```
+
+Flat bool filters (term values only — not full Query DSL):
+
+```json
+{
+  "q": "search",
+  "must": [{ "field": "tags", "value": "oss" }],
+  "should": [{ "field": "category", "value": "guide" }],
+  "mustNot": [{ "field": "status", "value": "draft" }]
+}
+```
+
+## Deep pagination (`search_after`)
+
+For results beyond `from + size ≤ ANVESH_MAX_RESULT_WINDOW` (default 10 000), pass the last hit's document id:
+
+```json
+{ "q": "articles", "size": 50, "searchAfter": "doc-id-from-previous-page" }
+```
+
+When `searchAfter` is set, `from` is ignored. Sort order follows score then id.
+
+## Suggest
+
+Prefix completions from the inverted term dictionary:
+
+```bash
+curl -s http://127.0.0.1:3848/v1/indexes/demo/suggest \
+  -H 'content-type: application/json' \
+  -d '{"prefix":"ligh","field":"title","size":5}'
+```
+
+Response: `{ "ok": true, "suggestions": ["lightweight", …] }`
+
+## Stats and histogram facets
+
+Pass special facet kinds alongside field names:
+
+```json
+{
+  "q": "coffee",
+  "facets": ["category", "stats:price", "histogram:price:10"]
+}
+```
+
+- `stats:field` — count, min, max, avg, sum on numeric fields
+- `histogram:field:interval` — fixed-width numeric buckets
+
+Terms facets (`"facets": ["category"]`) behave as before.
+
 ## Semantic
 
 Index with `settings.vectorDimensions` and pass embeddings on documents and queries (bring your own model).
@@ -73,7 +162,7 @@ Any mode can include a `geo` object to restrict candidates (and attach `distance
 {
   "ok": true,
   "code": "OK_SEARCH",
-  "message": "Search completed successfully. Found 3 matching document(s) in 1.2ms.",
+  "message": "Search completed. Found 3 matching documents in 1.2ms.",
   "tookMs": 1.2,
   "total": 3,
   "hits": [

@@ -71,4 +71,30 @@ describe("API", () => {
     expect(res.statusCode).toBe(200);
     expect(res.json().product).toBe("Anvesh");
   });
+
+  it("lists and invokes plugins like LLM tools", async () => {
+    const headers = { authorization: "Bearer test-key" };
+    const tools = await app.inject({ method: "GET", url: "/v1/plugins/tools", headers });
+    expect(tools.statusCode).toBe(200);
+    const catalog = tools.json().tools as Array<{ name: string }>;
+    expect(catalog.map((t) => t.name)).toEqual(
+      expect.arrayContaining(["vaakly.correct_summary", "vaakly.format_message"]),
+    );
+
+    const invoked = await app.inject({
+      method: "POST",
+      url: "/v1/plugins/invoke",
+      headers,
+      payload: {
+        name: "vaakly.correct_summary",
+        arguments: {
+          message: "Found 2 matching document(s).",
+          code: "OK_SEARCH",
+          total: 2,
+        },
+      },
+    });
+    expect(invoked.statusCode).toBe(200);
+    expect(invoked.json().result.message).toContain("2 matching documents");
+  });
 });

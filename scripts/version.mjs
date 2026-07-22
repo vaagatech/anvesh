@@ -70,7 +70,7 @@ function applyVersion(version) {
       const deps = pkg[field];
       if (!deps) continue;
       for (const name of Object.keys(deps)) {
-        if (name.startsWith("@vaagatech/anvesh-")) {
+        if (name.startsWith("@vaagatech/anvesh-") || name === "@vaagatech/vaakly") {
           deps[name] = version;
         }
       }

@@ -50,17 +50,27 @@ bundle exec jekyll serve --baseurl /anvesh-monorepo
 
 ## What is included
 
-| Path | Content |
-|------|---------|
-| `docs/index.md` | Overview |
-| `docs/getting-started.md` | Local quickstart |
-| `docs/architecture.md` | Collective design |
-| `docs/components/*` | Engine, Hub, Indexer, Spider, Shared, Setup |
-| `docs/guides/*` | Search, geo, storage, crawl, indexing |
-| `docs/api/*` | HTTP + library |
-| `docs/deploy.md` | Deploy options |
-| `docs/publishing.md` | npm publish |
-| `docs/_layouts` + `assets/css` | Site chrome |
+| Path | Content | Live URL |
+|------|---------|----------|
+| `docs/index.md` | Overview | `/` |
+| `docs/why-anvesh.md` | Pitch, market landscape, fit, recommendation | `/why-anvesh/` |
+| `docs/use-cases.md` | Product, docs, crawl, RAG, geo, hybrid backends | `/use-cases/` |
+| `docs/getting-started.md` | Local quickstart | `/getting-started/` |
+| `docs/demo.md` | Demo walkthrough | `/demo/` |
+| `docs/architecture.md` | Collective design | `/architecture/` |
+| `docs/operator-guide.md` | Happy path | `/operator-guide/` |
+| `docs/components/*` | Engine, Hub, Indexer, Spider, Shared, Setup | `/components/` |
+| `docs/guides/*` | Search, geo, storage, crawl, indexing, adapters, plugins | `/guides/` |
+| `docs/api/*` | HTTP + library | `/api/` |
+| `docs/versioning.md` | Bump, sync, tag, release | `/versioning/` |
+| `docs/deploy.md` | Deploy options | `/deploy/` |
+| `docs/publishing.md` | npm publish | `/publishing/` |
+| `docs/_layouts` + `assets/css` | Site chrome | — |
+
+After Pages deploys from `/docs` on `main`:
+
+- https://vaagatech.github.io/anvesh-monorepo/why-anvesh/
+- https://vaagatech.github.io/anvesh-monorepo/use-cases/
 
 ## After it is live
 

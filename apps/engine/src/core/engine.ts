@@ -7,6 +7,12 @@ import { InvertedIndex, type InvertedIndexSnapshot } from "./inverted-index.js";
 import { VectorStore, type VectorStoreSnapshot } from "./vector-store.js";
 import { blendScores } from "./hybrid.js";
 import { assertGeoPoint, distanceFromOrigin, validateGeoQuery } from "./geo.js";
+import { localEmbed, textFromFields, meaningfulVectorHits } from "./embed.js";
+import { globalCircuits } from "./circuit.js";
+import {
+  coerceDocumentFields,
+  expandMappingsFromFields,
+} from "./dynamic-mapping.js";
 import { AnveshError, formatMessage } from "../messaging/vaakly.js";
 import type { StorageAdapter } from "../storage/types.js";
 import type {
@@ -37,6 +43,7 @@ export interface PersistedIndex {
 export class AnveshEngine {
   private indexes = new Map<string, IndexState>();
   private dirty = new Set<string>();
+  private aliases = new Map<string, string>();
 
   constructor(private readonly storage: StorageAdapter) {}
 
@@ -110,7 +117,7 @@ export class AnveshEngine {
 
   async createIndex(
     name: string,
-    mappings: Record<string, FieldMapping>,
+    mappings: Record<string, FieldMapping> = {},
     settings: IndexSettings = {},
   ): Promise<IndexDefinition> {
     if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(name)) {
@@ -121,16 +128,17 @@ export class AnveshEngine {
     if (this.indexes.has(name)) {
       throw new AnveshError("ERR_INDEX_EXISTS", { name });
     }
+    const resolvedSettings: IndexSettings = { dynamicMapping: true, ...settings };
     const now = new Date().toISOString();
     const definition: IndexDefinition = {
       name,
-      mappings,
-      settings,
+      mappings: { ...mappings },
+      settings: resolvedSettings,
       createdAt: now,
       updatedAt: now,
       docCount: 0,
     };
-    const inverted = new InvertedIndex(mappings, settings);
+    const inverted = new InvertedIndex(definition.mappings, resolvedSettings);
     const vectors = settings.vectorDimensions
       ? new VectorStore(settings.vectorDimensions)
       : null;
@@ -154,9 +162,63 @@ export class AnveshEngine {
   }
 
   private require(name: string): IndexState {
-    const state = this.indexes.get(name);
+    const resolved = this.aliases.get(name) ?? name;
+    const state = this.indexes.get(resolved);
     if (!state) throw new AnveshError("ERR_INDEX_NOT_FOUND", { name });
     return state;
+  }
+
+  listAliases(): Record<string, string> {
+    return Object.fromEntries(this.aliases);
+  }
+
+  putAlias(alias: string, index: string): void {
+    if (!this.indexes.has(index)) throw new AnveshError("ERR_INDEX_NOT_FOUND", { name: index });
+    if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(alias)) {
+      throw new AnveshError("ERR_VALIDATION", { detail: "invalid alias name" });
+    }
+    this.aliases.set(alias, index);
+  }
+
+  deleteAlias(alias: string): void {
+    this.aliases.delete(alias);
+  }
+
+  suggest(
+    indexName: string,
+    prefix: string,
+    options: { field?: string; size?: number } = {},
+  ): string[] {
+    const state = this.require(indexName);
+    return state.inverted.suggest(prefix, options.field, options.size ?? 10);
+  }
+
+  async updateByQuery(
+    indexName: string,
+    body: {
+      filters?: SearchQuery["filters"];
+      set: Record<string, unknown>;
+      maxDocs?: number;
+    },
+  ): Promise<{ updated: number }> {
+    const state = this.require(indexName);
+    const maxDocs = body.maxDocs ?? 100;
+    globalCircuits.checkBulkSize(maxDocs);
+    const ids = state.inverted.filterDocIds(body.filters).slice(0, maxDocs);
+    let updated = 0;
+    for (const id of ids) {
+      const doc = state.inverted.get(id);
+      if (!doc) continue;
+      const fields = { ...doc.fields, ...(body.set as Record<string, JsonValue>) };
+      await this.indexDocument(indexName, {
+        id,
+        fields,
+        vector: doc.vector,
+        meta: doc.meta,
+      });
+      updated += 1;
+    }
+    return { updated };
   }
 
   /** Validate and normalize geo_point fields to `{ lat, lon }`. */
@@ -174,6 +236,46 @@ export class AnveshEngine {
     return out;
   }
 
+  /**
+   * Coerce values, optionally expand mappings (dynamic schema), then normalize.
+   * Mutates `state.definition.mappings` when dynamicMapping is enabled.
+   */
+  private prepareFields(
+    state: IndexState,
+    fields: Record<string, JsonValue>,
+  ): Record<string, JsonValue> {
+    const coerced = coerceDocumentFields(fields) as Record<string, JsonValue>;
+    const dynamic = state.definition.settings?.dynamicMapping !== false;
+    if (dynamic) {
+      expandMappingsFromFields(state.definition.mappings, coerced);
+    }
+    return this.normalizeFields(state.definition.mappings, coerced);
+  }
+
+  private publicDoc(doc: AnveshDocument): AnveshDocument {
+    const { vector: _v, ...rest } = doc;
+    return rest;
+  }
+
+  private shouldAutoEmbed(settings?: IndexSettings): boolean {
+    if (!settings?.vectorDimensions) return false;
+    if (settings.autoEmbed === false) return false;
+    return true; // default on when vectorDimensions is set
+  }
+
+  private ensureVectorStore(state: IndexState): VectorStore {
+    if (!state.vectors) {
+      const dims = state.definition.settings?.vectorDimensions;
+      if (!dims) {
+        throw new AnveshError("ERR_VALIDATION", {
+          detail: "index has no vectorDimensions; set settings.vectorDimensions to enable vectors",
+        });
+      }
+      state.vectors = new VectorStore(dims);
+    }
+    return state.vectors;
+  }
+
   async indexDocument(
     indexName: string,
     input: {
@@ -185,20 +287,21 @@ export class AnveshEngine {
   ): Promise<AnveshDocument> {
     const state = this.require(indexName);
     const id = input.id ?? randomUUID();
+    const fields = this.prepareFields(state, input.fields);
+    let vector = input.vector;
+    if (!vector && this.shouldAutoEmbed(state.definition.settings)) {
+      const dims = state.definition.settings!.vectorDimensions!;
+      vector = localEmbed(textFromFields(fields), dims);
+    }
     const doc: AnveshDocument = {
       id,
-      fields: this.normalizeFields(state.definition.mappings, input.fields),
+      fields,
       meta: input.meta,
       updatedAt: new Date().toISOString(),
     };
-    if (input.vector) {
-      if (!state.vectors) {
-        throw new AnveshError("ERR_VALIDATION", {
-          detail: "index has no vectorDimensions; set settings.vectorDimensions to enable vectors",
-        });
-      }
-      state.vectors.upsert(id, input.vector);
-      doc.vector = input.vector;
+    if (vector) {
+      this.ensureVectorStore(state).upsert(id, vector);
+      doc.vector = vector;
     }
     state.inverted.upsert(doc);
     state.definition.docCount = state.inverted.docCount;
@@ -212,24 +315,26 @@ export class AnveshEngine {
     const state = this.require(indexName);
     let indexed = 0;
     const errors: BulkIndexResult["errors"] = [];
+    const auto = this.shouldAutoEmbed(state.definition.settings);
+    const dims = state.definition.settings?.vectorDimensions;
 
     for (const item of items) {
       try {
         const id = item.id ?? randomUUID();
+        const fields = this.prepareFields(state, item.fields);
+        let vector = item.vector;
+        if (!vector && auto && dims) {
+          vector = localEmbed(textFromFields(fields), dims);
+        }
         const doc: AnveshDocument = {
           id,
-          fields: this.normalizeFields(state.definition.mappings, item.fields),
+          fields,
           meta: item.meta,
           updatedAt: new Date().toISOString(),
         };
-        if (item.vector) {
-          if (!state.vectors) {
-            throw new AnveshError("ERR_VALIDATION", {
-              detail: "index has no vectorDimensions configured",
-            });
-          }
-          state.vectors.upsert(id, item.vector);
-          doc.vector = item.vector;
+        if (vector) {
+          this.ensureVectorStore(state).upsert(id, vector);
+          doc.vector = vector;
         }
         state.inverted.upsert(doc);
         indexed += 1;
@@ -268,9 +373,44 @@ export class AnveshEngine {
     return doc;
   }
 
+  listDocuments(
+    indexName: string,
+    opts: { from?: number; size?: number } = {},
+  ): { total: number; documents: AnveshDocument[] } {
+    const state = this.require(indexName);
+    const from = opts.from ?? 0;
+    const size = Math.min(opts.size ?? 20, 200);
+    const ids = state.inverted.listIds();
+    const slice = ids.slice(from, from + size);
+    const documents = slice
+      .map((id) => state.inverted.get(id))
+      .filter((d): d is AnveshDocument => Boolean(d))
+      .map((d) => {
+        const { vector: _v, ...rest } = d;
+        return rest;
+      });
+    return { total: ids.length, documents };
+  }
+
+  async clearDocuments(indexName: string): Promise<{ deleted: number }> {
+    const state = this.require(indexName);
+    const ids = state.inverted.listIds();
+    for (const id of ids) {
+      state.inverted.remove(id);
+      state.vectors?.remove(id);
+    }
+    state.definition.docCount = 0;
+    state.definition.updatedAt = new Date().toISOString();
+    this.markDirty(indexName);
+    await this.flush(indexName);
+    return { deleted: ids.length };
+  }
+
   search(indexName: string, query: SearchQuery): SearchResult {
     const started = performance.now();
     const state = this.require(indexName);
+    globalCircuits.checkResultWindow(query.from ?? 0, query.size ?? 10);
+    globalCircuits.checkMemory();
     const mode =
       query.mode ??
       (query.geo && !query.q && !query.vector
@@ -282,9 +422,27 @@ export class AnveshEngine {
           : "keyword");
     const from = query.from ?? 0;
     const size = query.size ?? 10;
+    const fuzzyOpts = {
+      fuzziness: query.fuzziness,
+      phrase: query.phrase,
+      phraseSlop: query.phraseSlop,
+      prefix: query.prefix,
+      boosts: query.boosts,
+      searchAfter: query.searchAfter,
+      maxFuzzyCandidates: query.maxFuzzyCandidates ?? globalCircuits.config.maxFuzzyCandidates,
+    };
 
     if (!query.q && !query.vector && !query.geo) {
       throw new AnveshError("ERR_EMPTY_QUERY", { index: indexName });
+    }
+
+    // Auto-embed query text when semantic/hybrid needs a vector but none was sent.
+    let queryVector = query.vector;
+    const needsVector = mode === "semantic" || mode === "hybrid";
+    if (needsVector && !queryVector && query.q && this.shouldAutoEmbed(state.definition.settings)) {
+      const dims = state.definition.settings!.vectorDimensions!;
+      queryVector = localEmbed(query.q, dims);
+      this.ensureVectorStore(state);
     }
 
     if (query.geo) {
@@ -321,33 +479,57 @@ export class AnveshEngine {
       total = res.total;
     } else if (mode === "keyword") {
       if (!query.q) throw new AnveshError("ERR_EMPTY_QUERY", { index: indexName });
+      const filters = [...(query.filters ?? [])];
+      if (query.must?.length) {
+        for (const m of query.must) filters.push({ field: m.field, value: m.value });
+      }
+      if (query.mustNot?.length) {
+        // emulate must_not via post-filter after search — handled below
+      }
       const res = state.inverted.searchKeyword(query.q, textFields, {
-        filters: query.filters,
+        filters,
         geo: query.geo,
-        from,
-        size,
+        from: query.searchAfter ? 0 : from,
+        size: Math.max(size * (query.mustNot?.length || query.should?.length ? 3 : 1), size),
         highlight: query.highlight,
         minScore: query.minScore,
+        ...fuzzyOpts,
       });
-      hits = res.hits;
-      total = res.total;
+      let hitsList = res.hits;
+      if (query.should?.length) {
+        hitsList = hitsList.filter((h) =>
+          query.should!.some((s) => h.source.fields[s.field] === s.value),
+        );
+      }
+      if (query.mustNot?.length) {
+        hitsList = hitsList.filter(
+          (h) => !query.mustNot!.some((s) => h.source.fields[s.field] === s.value),
+        );
+      }
+      hits = hitsList.slice(0, size);
+      total = query.mustNot?.length || query.should?.length ? hitsList.length : res.total;
     } else if (mode === "semantic") {
-      if (!query.vector || !state.vectors) {
+      if (!queryVector || !state.vectors) {
         throw new AnveshError("ERR_VALIDATION", {
-          detail: "semantic search requires a query vector and vectorDimensions on the index",
+          detail:
+            "semantic search needs a query vector (or q with autoEmbed) and vectorDimensions on the index",
         });
       }
       const candidateIds = state.inverted.filterDocIds(query.filters, query.geo);
       const candidates = new Set(candidateIds);
-      const top = state.vectors.search(query.vector, {
-        topK: from + size,
+      const rawTop = state.vectors.search(queryVector, {
+        topK: Math.max(from + size * 5, 100),
         candidates,
-        minScore: query.minScore,
+        minScore: query.minScore ?? -1,
       });
+      const top =
+        query.minScore != null
+          ? rawTop
+          : meaningfulVectorHits(rawTop, { topK: from + size * 3 });
       total = top.length;
       hits = top.slice(from, from + size).map((r) => {
-        const source = state.inverted.get(r.id)!;
-        const hit = { id: r.id, score: r.score, source };
+        const source = this.publicDoc(state.inverted.get(r.id)!);
+        const hit = { id: r.id, score: Math.round(r.score * 1000) / 1000, source };
         if (query.geo?.origin) {
           const d = distanceFromOrigin(source.fields[query.geo.field], query.geo.origin);
           if (d !== null) return { ...hit, distanceKm: Math.round(d * 1000) / 1000 };
@@ -356,9 +538,10 @@ export class AnveshEngine {
       });
     } else {
       // hybrid
-      if (!query.q || !query.vector || !state.vectors) {
+      if (!query.q || !queryVector || !state.vectors) {
         throw new AnveshError("ERR_VALIDATION", {
-          detail: "hybrid search requires both q and vector, with vectorDimensions configured",
+          detail:
+            "hybrid search needs q and a vector (or autoEmbed) with vectorDimensions configured",
         });
       }
       const kwRes = state.inverted.searchKeyword(query.q, textFields, {
@@ -366,53 +549,49 @@ export class AnveshEngine {
         geo: query.geo,
         from: 0,
         size: Math.max(size * 5, 50),
-        highlight: false,
+        highlight: Boolean(query.highlight),
+        ...fuzzyOpts,
       });
       const keywordScores = new Map(kwRes.hits.map((h) => [h.id, h.score]));
       const candidateIds = state.inverted.filterDocIds(query.filters, query.geo);
-      const sem = state.vectors.search(query.vector, {
+      const semRaw = state.vectors.search(queryVector, {
         topK: Math.max(size * 5, 50),
         candidates: new Set(candidateIds),
       });
-      const semanticScores = new Map(sem.map((r) => [r.id, r.score]));
+      const semKept = meaningfulVectorHits(semRaw, { topK: Math.max(size * 5, 50) });
+      const semanticScores = new Map(semKept.map((r) => [r.id, r.score]));
+      // Only blend docs that matched keyword OR cleared the semantic floor
+      const blendIds = new Set<string>([...keywordScores.keys(), ...semanticScores.keys()]);
       const docs = new Map(
-        state.inverted.listIds().map((id) => [id, state.inverted.get(id)!] as const),
+        [...blendIds]
+          .map((id) => [id, state.inverted.get(id)!] as const)
+          .filter(([, d]) => Boolean(d)),
       );
-      const weight = state.definition.settings?.hybridKeywordWeight ?? 0.5;
+      const weight = state.definition.settings?.hybridKeywordWeight ?? 0.55;
       const blended = blendScores(keywordScores, semanticScores, weight, docs);
       const filtered = query.minScore
         ? blended.filter((h) => h.score >= query.minScore!)
-        : blended;
+        : blended.filter((h) => h.score > 0.05);
       total = filtered.length;
       hits = filtered.slice(from, from + size).map((h) => {
+        const source = this.publicDoc(h.source);
+        const base = {
+          ...h,
+          score: Math.round(h.score * 1000) / 1000,
+          source,
+          highlight: h.highlight ?? kwRes.hits.find((k) => k.id === h.id)?.highlight,
+        };
         if (query.geo?.origin) {
-          const d = distanceFromOrigin(h.source.fields[query.geo.field], query.geo.origin);
-          if (d !== null) return { ...h, distanceKm: Math.round(d * 1000) / 1000 };
+          const d = distanceFromOrigin(source.fields[query.geo.field], query.geo.origin);
+          if (d !== null) return { ...base, distanceKm: Math.round(d * 1000) / 1000 };
         }
-        return h;
+        return base;
       });
-      if (query.highlight && query.q) {
-        const terms = new Set(
-          query.q
-            .toLowerCase()
-            .split(/\W+/)
-            .filter(Boolean),
-        );
-        hits = hits.map((h) => {
-          const highlight: Record<string, string[]> = {};
-          for (const field of textFields) {
-            const text = String(h.source.fields[field] ?? "");
-            if (!text) continue;
-            for (const t of terms) {
-              if (text.toLowerCase().includes(t)) {
-                highlight[field] = [`…${text.slice(0, 120)}…`];
-                break;
-              }
-            }
-          }
-          return { ...h, highlight };
-        });
-      }
+    }
+
+    // Keyword / geo hits may still carry stored vectors — strip before response
+    if (mode === "keyword" || mode === "geo") {
+      hits = hits.map((h) => ({ ...h, source: this.publicDoc(h.source) }));
     }
 
     let facets: SearchResult["facets"];
@@ -420,7 +599,28 @@ export class AnveshEngine {
       facets = {};
       const idSet = new Set(hits.map((h) => h.id));
       for (const f of query.facets) {
-        facets[f] = state.inverted.facet(f, idSet.size ? idSet : undefined);
+        if (f.startsWith("stats:")) {
+          const field = f.slice("stats:".length);
+          const s = state.inverted.statsFacet(field, idSet.size ? idSet : undefined);
+          facets[f] = [
+            { key: "count", count: s.count },
+            { key: "min", count: s.min },
+            { key: "max", count: s.max },
+            { key: "avg", count: s.avg },
+            { key: "sum", count: s.sum },
+          ];
+        } else if (f.startsWith("histogram:")) {
+          const rest = f.slice("histogram:".length);
+          const [field, intervalRaw] = rest.split(":");
+          const interval = Number(intervalRaw ?? 10);
+          facets[f] = state.inverted.histogramFacet(
+            field!,
+            interval,
+            idSet.size ? idSet : undefined,
+          );
+        } else {
+          facets[f] = state.inverted.facet(f, idSet.size ? idSet : undefined);
+        }
       }
     }
 

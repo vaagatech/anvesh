@@ -9,14 +9,17 @@ export const fieldMappingSchema = z.object({
 
 export const createIndexSchema = z.object({
   name: z.string().min(1).max(64),
-  mappings: z.record(fieldMappingSchema),
+  /** Optional — empty `{}` is valid when dynamicMapping is on (default). */
+  mappings: z.record(fieldMappingSchema).default({}),
   settings: z
     .object({
       bm25k1: z.number().positive().optional(),
       bm25b: z.number().min(0).max(1).optional(),
       vectorDimensions: z.number().int().positive().optional(),
+      autoEmbed: z.boolean().optional(),
       hybridKeywordWeight: z.number().min(0).max(1).optional(),
       softMaxDocs: z.number().int().positive().optional(),
+      dynamicMapping: z.boolean().optional(),
     })
     .optional(),
 });
@@ -77,4 +80,46 @@ export const searchSchema = z.object({
   highlight: z.boolean().optional(),
   facets: z.array(z.string()).optional(),
   minScore: z.number().optional(),
+  fuzziness: z.union([z.boolean(), z.literal(0), z.literal(1), z.literal(2), z.literal("AUTO")]).optional(),
+  phrase: z.boolean().optional(),
+  phraseSlop: z.number().int().min(0).max(10).optional(),
+  prefix: z.boolean().optional(),
+  boosts: z.record(z.number()).optional(),
+  searchAfter: z.string().optional(),
+  must: z
+    .array(z.object({ field: z.string(), value: z.union([z.string(), z.number(), z.boolean()]) }))
+    .optional(),
+  should: z
+    .array(z.object({ field: z.string(), value: z.union([z.string(), z.number(), z.boolean()]) }))
+    .optional(),
+  mustNot: z
+    .array(z.object({ field: z.string(), value: z.union([z.string(), z.number(), z.boolean()]) }))
+    .optional(),
+});
+
+export const suggestSchema = z.object({
+  prefix: z.string().min(1),
+  field: z.string().optional(),
+  size: z.number().int().min(1).max(50).optional(),
+});
+
+export const updateByQuerySchema = z.object({
+  filters: z
+    .array(
+      z.union([
+        z.object({ field: z.string(), value: z.union([z.string(), z.number(), z.boolean()]) }),
+        z.object({
+          field: z.string(),
+          gte: z.union([z.number(), z.string()]).optional(),
+          lte: z.union([z.number(), z.string()]).optional(),
+          gt: z.union([z.number(), z.string()]).optional(),
+          lt: z.union([z.number(), z.string()]).optional(),
+        }),
+      ]),
+    )
+    .optional(),
+  set: z.record(z.unknown()).refine((o) => Object.keys(o).length > 0, {
+    message: "set must include at least one field",
+  }),
+  maxDocs: z.number().int().min(1).max(1000).optional(),
 });

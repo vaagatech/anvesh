@@ -15,7 +15,10 @@ anvesh/
 │   ├── indexer/    @vaagatech/anvesh-indexer
 │   └── spider/     @vaagatech/anvesh-spider
 ├── packages/
-│   └── shared/     @vaagatech/anvesh-shared
+│   ├── shared/            @vaagatech/anvesh-shared
+│   ├── plugins/           @vaagatech/anvesh-plugins
+│   ├── vaakly/            @vaagatech/vaakly
+│   └── search-adapters/   @vaagatech/anvesh-search-adapters
 ├── docs/           this GitHub Pages site
 └── deploy/         ECS / Kubernetes manifests (optional)
 ```

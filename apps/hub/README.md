@@ -1,29 +1,32 @@
 # Anvesh Hub
 
-Publishable control plane for the Anvesh stack (`@vaagatech/anvesh-hub`).
-
-## What Hub controls
-
-- **RBAC** — `admin` / `operator` / `viewer`
-- **Instances** — register multiple engine, indexer, and spider URLs
-- **Indexes** — create/list/delete on any engine instance
-- **Spider configs** — store role-based crawl configs and run jobs
-- **Indexer configs** — store bulk jobs and run against indexer workers
-- **Search** — try queries through the selected engine
-
-## Run
+Control plane for the Anvesh search stack — by [VaagaTech](https://www.vaagatech.com).
 
 ```bash
-npm run build -w @vaagatech/anvesh-hub
-ANVESH_HUB_ADMIN_USER=admin ANVESH_HUB_ADMIN_PASSWORD='change-me' npm run start -w @vaagatech/anvesh-hub
-# http://127.0.0.1:3849
+npx @vaagatech/anvesh-hub
+# → http://127.0.0.1:3849
 ```
 
-Dev (API only; UI via Vite proxy):
+## Capabilities
 
-```bash
-npm run dev:server -w @vaagatech/anvesh-hub   # :3849
-npm run dev:ui -w @vaagatech/anvesh-hub       # :5173 → proxies /hub
-```
+- **Instances** — register and edit engine / spider / indexer URLs
+- **Indexes** — create, inspect mappings, delete (engine-backed)
+- **Documents** — paste or import JSON/JSONL with schema validation before ingest
+- **Search** — keyword, semantic, hybrid, and geo modes
+- **Spider / Indexer** — save, edit, run configs; track jobs
+- **Jobs** — poll crawl/index job status
+- **Audit** — action history
+- **RBAC** — admin · operator · viewer
 
-By [VaagaTech](https://www.vaagatech.com).
+## Theme
+
+UI uses the **Cartographic Console** design language (blueprint grid, ocean teal, Syne + Manrope) with keyboard-friendly drawers, live status regions, and high-contrast focus rings.
+
+## Env
+
+| Variable | Default |
+|----------|---------|
+| `ANVESH_HUB_PORT` | `3849` |
+| `ANVESH_HUB_DATA` | `.anvesh/hub` |
+| `ANVESH_HUB_ADMIN_USER` | `admin` |
+| `ANVESH_HUB_ADMIN_PASSWORD` | `anvesh-admin-change-me` |

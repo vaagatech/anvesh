@@ -1,0 +1,13 @@
+{
+  "name": "@vaagatech/anvesh-e2e",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run --config vitest.config.ts",
+    "test:verbose": "E2E_VERBOSE=1 vitest run --config vitest.config.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.8"
+  }
+}

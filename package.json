@@ -8,8 +8,9 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build -w @vaagatech/anvesh-shared && npm run build -w @vaagatech/anvesh-engine && npm run build -w @vaagatech/anvesh-indexer && npm run build -w @vaagatech/anvesh-spider && npm run build -w @vaagatech/anvesh-hub && npm run build -w @vaagatech/anvesh-setup",
-    "test": "npm run test -w @vaagatech/anvesh-engine && npm run test -w @vaagatech/anvesh-spider",
+    "build": "npm run build -w @vaagatech/anvesh-shared && npm run build -w @vaagatech/anvesh-plugins && npm run build -w @vaagatech/vaakly && npm run build -w @vaagatech/anvesh-search-adapters && npm run build -w @vaagatech/anvesh-engine && npm run build -w @vaagatech/anvesh-indexer && npm run build -w @vaagatech/anvesh-spider && npm run build -w @vaagatech/anvesh-hub && npm run build -w @vaagatech/anvesh-setup",
+    "test": "npm run test -w @vaagatech/anvesh-plugins && npm run test -w @vaagatech/vaakly && npm run test -w @vaagatech/anvesh-search-adapters && npm run test -w @vaagatech/anvesh-engine && npm run test -w @vaagatech/anvesh-spider && npm run test -w @vaagatech/anvesh-hub",
+    "test:e2e": "npm run build && vitest run --config e2e/vitest.config.ts",
     "lint": "npm run lint --workspaces --if-present",
     "dev:engine": "npm run dev -w @vaagatech/anvesh-engine",
     "dev:hub": "npm run start -w @vaagatech/anvesh-hub",
@@ -18,13 +19,20 @@
     "dev:spider": "npm run start -w @vaagatech/anvesh-spider -- serve",
     "start:engine": "npm run start -w @vaagatech/anvesh-engine",
     "setup": "npm run start -w @vaagatech/anvesh-setup --",
+    "start": "bash scripts/start.sh",
+    "stop": "bash scripts/stop.sh",
+    "stack": "npm run setup -- up",
+    "stack:down": "npm run setup -- down",
     "example": "npm run example -w @vaagatech/anvesh-engine",
+    "demo:seed": "node examples/demo/seed.mjs",
+    "demo:start": "bash scripts/start.sh --seed",
     "version:check": "node scripts/version.mjs check",
     "version:sync": "node scripts/version.mjs sync",
     "version:set": "node scripts/version.mjs set",
     "version:bump": "node scripts/version.mjs bump",
+    "version:from-tag": "node scripts/version.mjs from-tag",
     "release": "bash scripts/release.sh",
-    "publish:dry": "npm run build && npm publish -w @vaagatech/anvesh-shared --access public --dry-run && npm publish -w @vaagatech/anvesh-engine --access public --dry-run && npm publish -w @vaagatech/anvesh-indexer --access public --dry-run && npm publish -w @vaagatech/anvesh-spider --access public --dry-run && npm publish -w @vaagatech/anvesh-hub --access public --dry-run && npm publish -w @vaagatech/anvesh-setup --access public --dry-run"
+    "publish:dry": "npm run build && npm publish -w @vaagatech/anvesh-shared --access public --dry-run && npm publish -w @vaagatech/anvesh-plugins --access public --dry-run && npm publish -w @vaagatech/vaakly --access public --dry-run && npm publish -w @vaagatech/anvesh-search-adapters --access public --dry-run && npm publish -w @vaagatech/anvesh-engine --access public --dry-run && npm publish -w @vaagatech/anvesh-indexer --access public --dry-run && npm publish -w @vaagatech/anvesh-spider --access public --dry-run && npm publish -w @vaagatech/anvesh-hub --access public --dry-run && npm publish -w @vaagatech/anvesh-setup --access public --dry-run"
   },
   "author": "VaagaTech <info@vaagatech.com>",
   "license": "MIT",

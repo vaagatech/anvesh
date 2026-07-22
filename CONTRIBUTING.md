@@ -5,7 +5,7 @@ Thanks for helping improve Anvesh — an open-source project by [VaagaTech](http
 ## Principles
 
 1. Keep the engine understandable — prefer clear code over clever abstractions.
-2. API user messages and logs stay meaningful (extend `src/messaging/vaakly.ts`).
+2. API user messages and logs stay meaningful (extend `@vaagatech/vaakly` / plugins).
 3. Hub remains optional; never require the UI for core features.
 4. Storage adapters must honor the `StorageAdapter` contract.
 5. Add tests for ranking, validation, and API envelopes.
@@ -28,7 +28,8 @@ Edit Markdown under [`docs/`](./docs/). The site is GitHub Pages from the `/docs
 - Include a short test plan.
 - Do not commit secrets or large binary indexes.
 - Keep Hub optional; never require the UI for core features.
-- Extend meaningful API/log messages in `apps/engine/src/messaging/vaakly.ts` when adding user-facing outcomes.
+- Extend meaningful API/log messages in `packages/vaakly` (or add a messaging plugin) when adding user-facing outcomes.
+- New plugins follow [Creating plugins](docs/guides/plugins.md) — tools are LLM-tool shaped (`name`, `description`, `parameters`, `execute`).
 
 ## Code of conduct
 

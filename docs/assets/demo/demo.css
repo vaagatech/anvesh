@@ -1,0 +1,126 @@
+/* Demo try-it panel — uses site CSS variables */
+.demo-try {
+  margin: 1.75rem 0 2.25rem;
+  padding: 1.25rem 0 0;
+  border-top: 1px solid var(--sand);
+}
+
+.demo-try .brand-line {
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 3.5vw, 2.1rem);
+  color: var(--moss-deep);
+  margin: 0 0 0.35rem;
+  letter-spacing: -0.02em;
+}
+
+.demo-try .support {
+  margin: 0 0 1.1rem;
+  color: var(--ink-soft);
+  max-width: 36rem;
+}
+
+.demo-form {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 40rem;
+}
+
+.demo-form label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--moss-deep);
+}
+
+.demo-form input[type="url"],
+.demo-form input[type="search"] {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--sand);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--ink);
+}
+
+.demo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.demo-actions button[type="submit"] {
+  border: 0;
+  border-radius: 8px;
+  padding: 0.65rem 1.1rem;
+  background: var(--moss);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.demo-actions button[type="submit"]:hover {
+  background: var(--moss-deep);
+}
+
+.demo-suggest {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.35rem 0 0;
+}
+
+.demo-suggest button {
+  border: 1px solid var(--sand);
+  background: transparent;
+  border-radius: 6px;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.demo-suggest button:hover {
+  border-color: var(--leaf);
+  color: var(--moss-deep);
+}
+
+#demo-status {
+  min-height: 1.35rem;
+  font-size: 0.92rem;
+  color: var(--ink-soft);
+  margin: 0.75rem 0 0.5rem;
+}
+
+#demo-status[data-tone="ok"] { color: var(--moss); }
+#demo-status[data-tone="err"] { color: #b42318; }
+
+.demo-hit {
+  padding: 0.85rem 0;
+  border-top: 1px solid var(--sand);
+}
+
+.demo-hit h3 {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+  color: var(--moss-deep);
+}
+
+.demo-hit p { margin: 0.25rem 0; }
+.demo-hit em {
+  font-style: normal;
+  background: rgba(63, 168, 122, 0.22);
+  padding: 0 0.15em;
+  border-radius: 2px;
+}
+
+.demo-meta {
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
+.demo-empty {
+  color: var(--ink-soft);
+  margin: 0.5rem 0;
+}

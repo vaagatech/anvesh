@@ -8,6 +8,8 @@
 
 **Docs:** [vaagatech.github.io/anvesh-monorepo](https://vaagatech.github.io/anvesh-monorepo/) · enable Pages from `/docs` ([guide](./docs/github-pages.md))
 
+**Start here:** [Why Anvesh](./docs/why-anvesh.md) · [Use cases](./docs/use-cases.md) · [Versioning](./docs/versioning.md)
+
 | Package | Role |
 |---------|------|
 | `@vaagatech/anvesh-engine` | Search API (BM25, vectors, geo) |
@@ -16,23 +18,29 @@
 | `@vaagatech/anvesh-spider` | Site crawler (+ `serve` worker, role-based login) |
 | `@vaagatech/anvesh-setup` | Easy local installer |
 | `@vaagatech/anvesh-shared` | Shared contracts |
+| `@vaagatech/anvesh-plugins` | Plugin host (LLM-tool style) |
+| `@vaagatech/vaakly` | API summary messaging plugin |
 
 ## Easy local setup
 
 ```bash
 npm install
-npm run build
-npm run setup -- init
-set -a; source .env.anvesh; set +a
-
-# terminals
-npm run start:engine          # :3848
-npm run start -w @vaagatech/anvesh-hub          # :3849  Hub UI + API
-npm run start -w @vaagatech/anvesh-spider -- serve   # :3851
-npm run start -w @vaagatech/anvesh-indexer -- serve  # :3852
+npm start                 # build (if needed) → init → engine + hub + spider + indexer
 ```
 
-Sign in to Hub (`admin` / password from `.env.anvesh`). Register instance URLs, manage indexes, spider/indexer configs, and users.
+Optional demo corpus:
+
+```bash
+npm start -- --seed       # same as above, then seed index "demo"
+```
+
+Open Hub at http://127.0.0.1:3849 (`admin` / password printed by the script, also in `.env.anvesh`). Local instances are registered automatically.
+
+**Operator guide:** [docs/operator-guide.md](./docs/operator-guide.md) · published at [vaagatech.github.io/anvesh-monorepo/operator-guide](https://vaagatech.github.io/anvesh-monorepo/operator-guide/)
+
+Stop with `npm run stop`.
+
+Try-it on Pages: [vaagatech.github.io/anvesh-monorepo/demo](https://vaagatech.github.io/anvesh-monorepo/demo/) (set Engine URL to a seeded public API, or use `http://127.0.0.1:3848` when testing locally with CORS).
 
 ## Hub as control plane
 

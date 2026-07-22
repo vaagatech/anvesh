@@ -257,6 +257,17 @@ export class SiteSpider {
         depth: item.depth,
         fetchedAt: new Date().toISOString(),
         contentType: ct || undefined,
+        lang: extracted.lang,
+        canonical: extracted.canonical,
+        author: extracted.author,
+        keywords: extracted.keywords,
+        headings: extracted.headings,
+        siteName: extracted.siteName,
+        ogTitle: extracted.ogTitle,
+        ogDescription: extracted.ogDescription,
+        ogType: extracted.ogType,
+        publishedAt: extracted.publishedAt,
+        hasArticle: extracted.hasArticle,
       };
     } catch (err) {
       this.log.warn(

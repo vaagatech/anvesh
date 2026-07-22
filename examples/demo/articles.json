@@ -1,0 +1,182 @@
+[
+  {
+    "id": "demo-01",
+    "fields": {
+      "title": "Welcome to Anvesh",
+      "body": "Anvesh is a lightweight search stack for Node.js by VaagaTech. Run full-text search locally without operating a heavy cluster.",
+      "tags": "anvesh,intro",
+      "location": { "lat": 12.9716, "lon": 77.5946 }
+    }
+  },
+  {
+    "id": "demo-02",
+    "fields": {
+      "title": "BM25 keyword search",
+      "body": "The engine ranks documents with BM25 for keyword queries. Highlight snippets make it easy to show why a hit matched.",
+      "tags": "search,keyword,bm25",
+      "location": { "lat": 12.975, "lon": 77.606 }
+    }
+  },
+  {
+    "id": "demo-03",
+    "fields": {
+      "title": "Semantic and hybrid modes",
+      "body": "Combine keyword BM25 with vector similarity for hybrid search. Semantic mode is useful when exact terms do not appear in the document.",
+      "tags": "search,semantic,hybrid",
+      "location": { "lat": 12.9352, "lon": 77.6245 }
+    }
+  },
+  {
+    "id": "demo-04",
+    "fields": {
+      "title": "Geo search near Bengaluru",
+      "body": "Index geo_point fields and filter by radius or bounding box. Sort results by distance for location-aware demos.",
+      "tags": "geo,maps",
+      "location": { "lat": 12.9507, "lon": 77.5847 }
+    }
+  },
+  {
+    "id": "demo-05",
+    "fields": {
+      "title": "Hub control plane",
+      "body": "Anvesh Hub is an optional RBAC control plane. Register multiple engine, spider, and indexer instances and manage indexes from one UI.",
+      "tags": "hub,rbac",
+      "location": { "lat": 13.0827, "lon": 80.2707 }
+    }
+  },
+  {
+    "id": "demo-06",
+    "fields": {
+      "title": "RBAC roles in Hub",
+      "body": "Hub supports admin, operator, and viewer roles. Admins manage users and instances; operators run indexes and jobs; viewers can search.",
+      "tags": "hub,rbac,security",
+      "location": { "lat": 13.0827, "lon": 80.2707 }
+    }
+  },
+  {
+    "id": "demo-07",
+    "fields": {
+      "title": "Site spider with roles",
+      "body": "The spider crawls a site with BFS, robots.txt, and sitemaps. Role-based login discovers pages for guest, form, cookie, or bearer sessions.",
+      "tags": "spider,crawl",
+      "location": { "lat": 19.076, "lon": 72.8777 }
+    }
+  },
+  {
+    "id": "demo-08",
+    "fields": {
+      "title": "Bulk indexer",
+      "body": "Load JSON or JSONL into an index with the indexer CLI or worker. Map crawled pages into documents and push them to the engine API.",
+      "tags": "indexer,bulk",
+      "location": { "lat": 18.5204, "lon": 73.8567 }
+    }
+  },
+  {
+    "id": "demo-09",
+    "fields": {
+      "title": "Filesystem storage by default",
+      "body": "Local development uses Node.js and filesystem storage. No Docker is required for day-to-day work. Data lives under .anvesh/data.",
+      "tags": "storage,local",
+      "location": { "lat": 12.9716, "lon": 77.5946 }
+    }
+  },
+  {
+    "id": "demo-10",
+    "fields": {
+      "title": "Pluggable storage backends",
+      "body": "Production can use Redis, S3, DynamoDB, or MongoDB for index state. Swap storage with environment variables without changing application code.",
+      "tags": "storage,cloud",
+      "location": { "lat": 37.7749, "lon": -122.4194 }
+    }
+  },
+  {
+    "id": "demo-11",
+    "fields": {
+      "title": "Easy setup installer",
+      "body": "anvesh-setup scaffolds .anvesh folders, writes .env.anvesh with a generated admin password, and prints how to start each app.",
+      "tags": "setup,install",
+      "location": { "lat": 28.6139, "lon": 77.209 }
+    }
+  },
+  {
+    "id": "demo-12",
+    "fields": {
+      "title": "Meaningful API messages",
+      "body": "Responses include human-readable message fields inspired by Vaakly. Operators can understand success and failure without decoding opaque codes alone.",
+      "tags": "api,messaging",
+      "location": { "lat": 51.5074, "lon": -0.1278 }
+    }
+  },
+  {
+    "id": "demo-13",
+    "fields": {
+      "title": "Open source by VaagaTech",
+      "body": "Anvesh is MIT licensed open source from VaagaTech. Use it for product search, docs search, or internal knowledge bases.",
+      "tags": "vaagatech,oss",
+      "location": { "lat": 12.9716, "lon": 77.5946 }
+    }
+  },
+  {
+    "id": "demo-14",
+    "fields": {
+      "title": "Containers when you need them",
+      "body": "The same engine process runs in Docker, ECS, or Kubernetes. Compose is optional; prefer npm start for local demos.",
+      "tags": "deploy,docker",
+      "location": { "lat": 47.6062, "lon": -122.3321 }
+    }
+  },
+  {
+    "id": "demo-15",
+    "fields": {
+      "title": "Lambda and serverless path",
+      "body": "SAM template support lets you expose the engine behind API Gateway with S3-backed storage for serverless demos.",
+      "tags": "deploy,serverless",
+      "location": { "lat": 38.9072, "lon": -77.0369 }
+    }
+  },
+  {
+    "id": "demo-16",
+    "fields": {
+      "title": "Facets and filters",
+      "body": "Filter by keyword fields and request facets to power category chips. Pair filters with a free-text query for catalog-style search.",
+      "tags": "search,filters,facets",
+      "location": { "lat": 35.6762, "lon": 139.6503 }
+    }
+  },
+  {
+    "id": "demo-17",
+    "fields": {
+      "title": "Highlight matched terms",
+      "body": "Turn on highlight in the search request to wrap matched tokens. Perfect for live demos where the audience should see why a result ranked.",
+      "tags": "search,highlight",
+      "location": { "lat": 48.8566, "lon": 2.3522 }
+    }
+  },
+  {
+    "id": "demo-18",
+    "fields": {
+      "title": "Multi-instance engines",
+      "body": "Run several engine instances on different ports or hosts. Register each URL in Hub and switch which index cluster you manage.",
+      "tags": "hub,scale",
+      "location": { "lat": 52.52, "lon": 13.405 }
+    }
+  },
+  {
+    "id": "demo-19",
+    "fields": {
+      "title": "Shared crawl contracts",
+      "body": "anvesh-shared defines crawled page shapes so spider output feeds the indexer cleanly without ad-hoc mapping scripts.",
+      "tags": "shared,contracts",
+      "location": { "lat": 40.7128, "lon": -74.006 }
+    }
+  },
+  {
+    "id": "demo-20",
+    "fields": {
+      "title": "Try the demo index",
+      "body": "This corpus powers the Anvesh demo. Search for lightweight, hub, geo, or spider to see keyword ranking and highlights in action.",
+      "tags": "demo,anvesh",
+      "location": { "lat": 12.9716, "lon": 77.5946 }
+    }
+  }
+]

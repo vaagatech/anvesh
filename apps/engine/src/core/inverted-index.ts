@@ -5,6 +5,8 @@
 import { getAnalyzer, fieldToText } from "./analyzer.js";
 import { bm25TermScore } from "./bm25.js";
 import { distanceFromOrigin, matchesGeo } from "./geo.js";
+import { levenshtein, resolveFuzziness, wildcardMatch } from "./fuzzy.js";
+import { globalCircuits } from "./circuit.js";
 import type {
   AnveshDocument,
   DocumentId,
@@ -187,13 +189,64 @@ export class InvertedIndex {
       size?: number;
       highlight?: boolean;
       minScore?: number;
+      fuzziness?: boolean | 0 | 1 | 2 | "AUTO";
+      phrase?: boolean;
+      phraseSlop?: number;
+      prefix?: boolean;
+      boosts?: Record<string, number>;
+      searchAfter?: string;
+      maxFuzzyCandidates?: number;
     } = {},
   ): { total: number; hits: SearchHit[] } {
-    const tokens = getAnalyzer("standard").analyze(query);
+    const rawTokens = query.trim().split(/\s+/).filter(Boolean);
+    const hasWildcard = rawTokens.some((t) => /[*?]/.test(t));
+    const tokens = hasWildcard
+      ? rawTokens.map((t) => t.toLowerCase())
+      : getAnalyzer("standard").analyze(query);
     if (!tokens.length) return { total: 0, hits: [] };
 
     const scores = new Map<DocumentId, number>();
     const matchedTerms = new Map<DocumentId, Set<string>>();
+    const fuzzyCap = options.maxFuzzyCandidates ?? 50;
+
+    const collectTerms = (
+      fieldPostings: Map<string, Posting[]>,
+      term: string,
+    ): Array<{ term: string; distance: number }> => {
+      if (hasWildcard && /[*?]/.test(term)) {
+        const out: Array<{ term: string; distance: number }> = [];
+        for (const dictTerm of fieldPostings.keys()) {
+          if (wildcardMatch(term, dictTerm)) out.push({ term: dictTerm, distance: 0 });
+          if (out.length >= fuzzyCap) break;
+        }
+        return out;
+      }
+      if (options.prefix) {
+        const out: Array<{ term: string; distance: number }> = [];
+        for (const dictTerm of fieldPostings.keys()) {
+          if (dictTerm.startsWith(term)) out.push({ term: dictTerm, distance: 0 });
+          if (out.length >= fuzzyCap) break;
+        }
+        return out.length ? out : fieldPostings.has(term) ? [{ term, distance: 0 }] : [];
+      }
+      const maxDist = resolveFuzziness(options.fuzziness, term.length);
+      if (maxDist === 0) {
+        return fieldPostings.has(term) ? [{ term, distance: 0 }] : [];
+      }
+      const out: Array<{ term: string; distance: number }> = [];
+      if (fieldPostings.has(term)) out.push({ term, distance: 0 });
+      for (const dictTerm of fieldPostings.keys()) {
+        if (dictTerm === term) continue;
+        if (Math.abs(dictTerm.length - term.length) > maxDist) continue;
+        const d = levenshtein(term, dictTerm);
+        if (d > 0 && d <= maxDist) out.push({ term: dictTerm, distance: d });
+        if (out.length >= fuzzyCap) {
+          globalCircuits.capFuzzy(fuzzyCap + 1);
+          break;
+        }
+      }
+      return out;
+    };
 
     for (const field of fields) {
       const fieldPostings = this.postings.get(field);
@@ -201,22 +254,67 @@ export class InvertedIndex {
       if (!fieldPostings || !dfMap) continue;
       const avgLen = this.avgFieldLength.get(field) ?? 0;
       const lengths = this.docLengths.get(field);
+      const boost = options.boosts?.[field] ?? 1;
+
+      if (options.phrase && tokens.length > 1 && !hasWildcard) {
+        const slop = options.phraseSlop ?? 0;
+        for (const [docId, doc] of this.documents) {
+          if (!this.matchesFilters(doc, options.filters, options.geo)) continue;
+          const first = fieldPostings.get(tokens[0]!);
+          if (!first) continue;
+          const positionsByTerm = tokens.map((t) => {
+            const posts = fieldPostings.get(t)?.filter((p) => p.docId === docId) ?? [];
+            return posts.flatMap((p) => p.positions);
+          });
+          if (positionsByTerm.some((p) => !p.length)) continue;
+          let ok = false;
+          for (const p0 of positionsByTerm[0]!) {
+            let cursor = p0;
+            let matched = true;
+            for (let i = 1; i < positionsByTerm.length; i++) {
+              const next = positionsByTerm[i]!.find((p) => p >= cursor + 1 && p <= cursor + 1 + slop);
+              if (next === undefined) {
+                matched = false;
+                break;
+              }
+              cursor = next;
+            }
+            if (matched) {
+              ok = true;
+              break;
+            }
+          }
+          if (!ok) continue;
+          const add = 2.5 * boost;
+          scores.set(docId, (scores.get(docId) ?? 0) + add);
+          if (!matchedTerms.has(docId)) matchedTerms.set(docId, new Set());
+          for (const t of tokens) matchedTerms.get(docId)!.add(t);
+        }
+        continue;
+      }
 
       for (const term of tokens) {
-        const postings = fieldPostings.get(term);
-        if (!postings) continue;
-        const df = dfMap.get(term) ?? postings.length;
-        for (const p of postings) {
-          const doc = this.documents.get(p.docId);
-          if (!doc || !this.matchesFilters(doc, options.filters, options.geo)) continue;
-          const dl = lengths?.get(p.docId) ?? 0;
-          const add = bm25TermScore(p.tf, dl, avgLen, df, this.docCount, {
-            k1: this.settings.bm25k1,
-            b: this.settings.bm25b,
-          });
-          scores.set(p.docId, (scores.get(p.docId) ?? 0) + add);
-          if (!matchedTerms.has(p.docId)) matchedTerms.set(p.docId, new Set());
-          matchedTerms.get(p.docId)!.add(term);
+        const variants = collectTerms(fieldPostings, term);
+        for (const { term: dictTerm, distance } of variants) {
+          const postings = fieldPostings.get(dictTerm);
+          if (!postings) continue;
+          const df = dfMap.get(dictTerm) ?? postings.length;
+          const decay = distance === 0 ? 1 : 1 / (1 + distance);
+          for (const p of postings) {
+            const doc = this.documents.get(p.docId);
+            if (!doc || !this.matchesFilters(doc, options.filters, options.geo)) continue;
+            const dl = lengths?.get(p.docId) ?? 0;
+            const add =
+              bm25TermScore(p.tf, dl, avgLen, df, this.docCount, {
+                k1: this.settings.bm25k1,
+                b: this.settings.bm25b,
+              }) *
+              decay *
+              boost;
+            scores.set(p.docId, (scores.get(p.docId) ?? 0) + add);
+            if (!matchedTerms.has(p.docId)) matchedTerms.set(p.docId, new Set());
+            matchedTerms.get(p.docId)!.add(dictTerm);
+          }
         }
       }
     }
@@ -224,10 +322,15 @@ export class InvertedIndex {
     const minScore = options.minScore ?? 0;
     let ranked = [...scores.entries()]
       .filter(([, s]) => s >= minScore)
-      .sort((a, b) => b[1] - a[1]);
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+
+    if (options.searchAfter) {
+      const idx = ranked.findIndex(([id]) => id === options.searchAfter);
+      ranked = idx >= 0 ? ranked.slice(idx + 1) : ranked;
+    }
 
     const total = ranked.length;
-    const from = options.from ?? 0;
+    const from = options.searchAfter ? 0 : (options.from ?? 0);
     const size = options.size ?? 10;
     ranked = ranked.slice(from, from + size);
 
@@ -338,6 +441,69 @@ export class InvertedIndex {
       counts.set(k, cur);
     }
     return [...counts.values()].sort((a, b) => b.count - a.count);
+  }
+
+  /** Numeric stats aggregation. */
+  statsFacet(
+    field: string,
+    docIds?: Set<DocumentId>,
+  ): { count: number; min: number; max: number; avg: number; sum: number } {
+    let count = 0;
+    let sum = 0;
+    let min = Number.POSITIVE_INFINITY;
+    let max = Number.NEGATIVE_INFINITY;
+    for (const [id, doc] of this.documents) {
+      if (docIds && !docIds.has(id)) continue;
+      const v = doc.fields[field];
+      const n = typeof v === "number" ? v : Number(v);
+      if (!Number.isFinite(n)) continue;
+      count += 1;
+      sum += n;
+      if (n < min) min = n;
+      if (n > max) max = n;
+    }
+    if (!count) return { count: 0, min: 0, max: 0, avg: 0, sum: 0 };
+    return { count, min, max, avg: sum / count, sum };
+  }
+
+  /** Fixed-interval histogram on a numeric field. */
+  histogramFacet(
+    field: string,
+    interval: number,
+    docIds?: Set<DocumentId>,
+  ): Array<{ key: number; count: number }> {
+    if (!(interval > 0)) return [];
+    const counts = new Map<number, number>();
+    for (const [id, doc] of this.documents) {
+      if (docIds && !docIds.has(id)) continue;
+      const v = doc.fields[field];
+      const n = typeof v === "number" ? v : Number(v);
+      if (!Number.isFinite(n)) continue;
+      const bucket = Math.floor(n / interval) * interval;
+      counts.set(bucket, (counts.get(bucket) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+      .map(([key, count]) => ({ key, count }))
+      .sort((a, b) => a.key - b.key);
+  }
+
+  /** Prefix completions from the term dictionary. */
+  suggest(prefix: string, field?: string, size = 10): string[] {
+    const p = prefix.toLowerCase();
+    const out: string[] = [];
+    const fields = field ? [field] : [...this.postings.keys()];
+    const seen = new Set<string>();
+    for (const f of fields) {
+      const terms = this.postings.get(f);
+      if (!terms) continue;
+      for (const term of terms.keys()) {
+        if (!term.startsWith(p) || seen.has(term)) continue;
+        seen.add(term);
+        out.push(term);
+        if (out.length >= size) return out;
+      }
+    }
+    return out;
   }
 
   /** All docs matching filters (for semantic/hybrid candidate narrowing). */

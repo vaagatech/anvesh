@@ -13,6 +13,7 @@ Anvesh is a **monorepo of cooperating apps**. Use only what you need: many deplo
   <a href="{{ '/components/indexer/' | relative_url }}"><strong>Indexer</strong><span>Bulk-load JSON / spider JSONL into the engine.</span></a>
   <a href="{{ '/components/spider/' | relative_url }}"><strong>Spider</strong><span>Full-site crawl with post-login role passes.</span></a>
   <a href="{{ '/components/shared/' | relative_url }}"><strong>Shared</strong><span>Types &amp; schemas shared by spider and indexer.</span></a>
+  <a href="{{ '/guides/plugins/' | relative_url }}"><strong>Plugins</strong><span>LLM-tool-style plugins — Vaakly corrects API summaries.</span></a>
   <a href="{{ '/components/setup/' | relative_url }}"><strong>Setup</strong><span>Easy local installer / scaffold CLI.</span></a>
 </div>
 
@@ -29,10 +30,11 @@ Anvesh is a **monorepo of cooperating apps**. Use only what you need: many deplo
 ## Dependency graph
 
 ```
-shared
+plugins · vaakly · shared · search-adapters
   ↑
-  ├── spider
-  └── indexer → engine
+  ├── engine (vaakly + plugins by default)
+  ├── spider ← shared
+  └── indexer ← shared → engine
 hub ···············→ engine (HTTP only)
 ```
 

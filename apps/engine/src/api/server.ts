@@ -7,8 +7,10 @@ import Fastify, {
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import { AnveshEngine } from "../core/engine.js";
+import { globalCircuits } from "../core/circuit.js";
 import { AnveshError, apiEnvelope, formatMessage } from "../messaging/vaakly.js";
 import { createLogger, getLogger, logMessage } from "../logging/logger.js";
+import { createEnginePluginRegistry } from "../plugins/load.js";
 import { createStorage, type StorageKind } from "../storage/index.js";
 import type { JsonValue } from "../types.js";
 import {
@@ -16,7 +18,10 @@ import {
   createIndexSchema,
   indexDocumentSchema,
   searchSchema,
+  suggestSchema,
+  updateByQuerySchema,
 } from "./schemas.js";
+import { z } from "zod";
 
 export interface AnveshServerOptions {
   storage?: StorageKind;
@@ -27,6 +32,8 @@ export interface AnveshServerOptions {
   enableHubStatic?: boolean;
   hubDistPath?: string;
   loggerPretty?: boolean;
+  /** Plugin ids to enable (default: env ANVESH_PLUGINS or `vaakly`). */
+  plugins?: string[];
 }
 
 declare module "fastify" {
@@ -45,6 +52,7 @@ function timingSafeEqual(a: string, b: string): boolean {
 export async function createAnveshApp(options: AnveshServerOptions = {}): Promise<{
   app: FastifyInstance;
   engine: AnveshEngine;
+  plugins: ReturnType<typeof createEnginePluginRegistry>;
 }> {
   createLogger({ pretty: options.loggerPretty });
   const storageKind = (options.storage ??
@@ -65,12 +73,32 @@ export async function createAnveshApp(options: AnveshServerOptions = {}): Promis
   const engine = new AnveshEngine(storage);
   await engine.init();
 
+  const plugins = createEnginePluginRegistry({
+    plugins: options.plugins,
+    host: "anvesh-engine",
+  });
+
+  const maxBody = globalCircuits.config.maxBodyBytes;
   const app = Fastify({
     logger: false,
     trustProxy: true,
-    bodyLimit: 5 * 1024 * 1024,
+    bodyLimit: maxBody,
     requestIdHeader: "x-request-id",
     genReqId: () => randomUUID(),
+  });
+
+  app.setErrorHandler((err, req, reply) => {
+    const status = (err as { statusCode?: number }).statusCode;
+    if (status === 413) {
+      globalCircuits.tripped.body = (globalCircuits.tripped.body ?? 0) + 1;
+      return reply.status(413).send({
+        ok: false,
+        code: "ERR_CIRCUIT_BODY",
+        message: `Request body too large (max ${maxBody} bytes).`,
+        requestId: req.requestId,
+      });
+    }
+    return sendError(reply, err, req.requestId);
   });
 
   await app.register(cors, {
@@ -123,6 +151,17 @@ export async function createAnveshApp(options: AnveshServerOptions = {}): Promis
         requestId,
       });
     }
+    const circuit = err as Error & { code?: string; httpStatus?: number };
+    if (circuit?.code?.startsWith("ERR_CIRCUIT_") && circuit.httpStatus) {
+      getLogger().warn({ err: circuit.message, code: circuit.code, requestId }, "circuit tripped");
+      return reply.status(circuit.httpStatus).send({
+        ok: false,
+        code: circuit.code,
+        message: circuit.message,
+        requestId,
+        circuits: globalCircuits.stats(),
+      });
+    }
     getLogger().error({ err, requestId }, "unhandled error");
     const m = formatMessage("ERR_INTERNAL", {
       requestId,
@@ -145,6 +184,7 @@ export async function createAnveshApp(options: AnveshServerOptions = {}): Promis
       storage: storage.name,
       uptimeMs,
       ...stats,
+      circuits: globalCircuits.stats(),
       vendor: "VaagaTech",
       product: "Anvesh",
     }, { uptimeMs, storage: storage.name });
@@ -244,6 +284,10 @@ export async function createAnveshApp(options: AnveshServerOptions = {}): Promis
     try {
       const { name } = req.params as { name: string };
       const body = bulkIndexSchema.parse(req.body);
+      globalCircuits.checkBulkSize(body.documents.length);
+      globalCircuits.checkMemory();
+      const index = engine.getIndex(name);
+      globalCircuits.checkDocCap(index.docCount, body.documents.length);
       const result = await engine.bulkIndex(
         name,
         body.documents.map((d) => ({
@@ -280,6 +324,39 @@ export async function createAnveshApp(options: AnveshServerOptions = {}): Promis
     }
   });
 
+  app.get("/v1/indexes/:name/documents", async (req, reply) => {
+    try {
+      const { name } = req.params as { name: string };
+      const q = req.query as { from?: string; size?: string };
+      const result = engine.listDocuments(name, {
+        from: q.from ? Number(q.from) : 0,
+        size: q.size ? Number(q.size) : 20,
+      });
+      return {
+        ok: true,
+        message: `Listed ${result.documents.length} of ${result.total} document(s).`,
+        ...result,
+      };
+    } catch (err) {
+      return sendError(reply, err, req.requestId);
+    }
+  });
+
+  app.delete("/v1/indexes/:name/documents", async (req, reply) => {
+    try {
+      const { name } = req.params as { name: string };
+      const result = await engine.clearDocuments(name);
+      logMessage("OK_DOC_DELETED", { index: name, id: "*" }, { requestId: req.requestId });
+      return {
+        ok: true,
+        message: `Cleared ${result.deleted} document(s) from \"${name}\".`,
+        ...result,
+      };
+    } catch (err) {
+      return sendError(reply, err, req.requestId);
+    }
+  });
+
   app.delete("/v1/indexes/:name/documents/:id", async (req, reply) => {
     try {
       const { name, id } = req.params as { name: string; id: string };
@@ -295,7 +372,16 @@ export async function createAnveshApp(options: AnveshServerOptions = {}): Promis
     try {
       const { name } = req.params as { name: string };
       const body = searchSchema.parse(req.body);
-      const result = engine.search(name, body);
+      const result = await globalCircuits.withSearchSlot(() => {
+        globalCircuits.checkResultWindow(body.from ?? 0, body.size ?? 10);
+        return engine.search(name, {
+          ...body,
+          maxFuzzyCandidates: globalCircuits.config.maxFuzzyCandidates,
+        });
+      });
+      if (globalCircuits.tripped.fuzzy) {
+        reply.header("x-anvesh-fuzzy-capped", "1");
+      }
       logMessage(
         "OK_SEARCH",
         { index: name, total: result.total, tookMs: result.tookMs, mode: body.mode ?? "keyword" },
@@ -313,13 +399,118 @@ export async function createAnveshApp(options: AnveshServerOptions = {}): Promis
     }
   });
 
+  app.post("/v1/indexes/:name/suggest", async (req, reply) => {
+    try {
+      const { name } = req.params as { name: string };
+      const body = suggestSchema.parse(req.body);
+      const suggestions = engine.suggest(name, body.prefix, {
+        field: body.field,
+        size: body.size,
+      });
+      return { ok: true, suggestions };
+    } catch (err) {
+      return sendError(reply, err instanceof Error && err.name === "ZodError"
+        ? new AnveshError("ERR_VALIDATION", { detail: err.message })
+        : err, req.requestId);
+    }
+  });
+
+  app.post("/v1/indexes/:name/update-by-query", async (req, reply) => {
+    try {
+      const { name } = req.params as { name: string };
+      const body = updateByQuerySchema.parse(req.body);
+      globalCircuits.checkMemory();
+      const result = await engine.updateByQuery(name, {
+        filters: body.filters as Parameters<typeof engine.updateByQuery>[1]["filters"],
+        set: body.set as Record<string, unknown>,
+        maxDocs: body.maxDocs,
+      });
+      return { ok: true, ...result };
+    } catch (err) {
+      return sendError(reply, err instanceof Error && err.name === "ZodError"
+        ? new AnveshError("ERR_VALIDATION", { detail: err.message })
+        : err, req.requestId);
+    }
+  });
+
+  app.get("/v1/aliases", async () => {
+    return { ok: true, aliases: engine.listAliases() };
+  });
+
+  app.put("/v1/aliases/:alias", async (req, reply) => {
+    try {
+      const { alias } = req.params as { alias: string };
+      const body = (req.body ?? {}) as { index?: string };
+      if (!body.index) throw new AnveshError("ERR_VALIDATION", { detail: "index is required" });
+      engine.putAlias(alias, body.index);
+      return { ok: true, alias, index: body.index };
+    } catch (err) {
+      return sendError(reply, err, req.requestId);
+    }
+  });
+
+  app.delete("/v1/aliases/:alias", async (req, reply) => {
+    try {
+      const { alias } = req.params as { alias: string };
+      engine.deleteAlias(alias);
+      return { ok: true, alias };
+    } catch (err) {
+      return sendError(reply, err, req.requestId);
+    }
+  });
+
   app.get("/v1/stats", async (req) => {
     const stats = engine.stats();
     logMessage("OK_STATS", stats, { requestId: req.requestId });
-    return apiEnvelope("OK_STATS", { stats }, stats);
+    return apiEnvelope(
+      "OK_STATS",
+      { stats, circuits: globalCircuits.stats() },
+      stats,
+    );
   });
 
-  return { app, engine };
+  // ─── Plugins (LLM-tool style catalog + invoke) ─────────────────────────────
+
+  app.get("/v1/plugins", async () => ({
+    ok: true,
+    plugins: plugins.listPlugins(),
+  }));
+
+  app.get("/v1/plugins/tools", async () => ({
+    ok: true,
+    tools: plugins.listTools(),
+  }));
+
+  app.post("/v1/plugins/invoke", async (req, reply) => {
+    try {
+      const body = z
+        .object({
+          name: z.string().min(1),
+          arguments: z.record(z.unknown()).default({}),
+        })
+        .parse(req.body);
+      const result = await plugins.invoke(body.name, body.arguments);
+      if (!result.ok) {
+        return reply.status(404).send({
+          ok: false,
+          code: "ERR_VALIDATION",
+          message: result.error ?? `Unknown tool "${body.name}".`,
+          tool: body.name,
+        });
+      }
+      return { ok: true, tool: result.tool, result: result.result };
+    } catch (err) {
+      return sendError(
+        reply,
+        err instanceof Error && err.name === "ZodError"
+          ? new AnveshError("ERR_VALIDATION", { detail: err.message })
+          : err,
+        req.requestId,
+      );
+    }
+  });
+
+  return { app, engine, plugins };
 }
 
 export async function listenAnvesh(

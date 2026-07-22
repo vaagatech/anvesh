@@ -50,10 +50,20 @@ export interface IndexSettings {
   bm25b?: number;
   /** Expected vector dimensions when using semantic search. */
   vectorDimensions?: number;
+  /**
+   * When true (default if vectorDimensions set), embed text fields / queries
+   * locally if no vector is provided.
+   */
+  autoEmbed?: boolean;
   /** Hybrid blend: weight for keyword score (0–1). Semantic gets 1 - keywordWeight. */
   hybridKeywordWeight?: number;
   /** Max documents kept in a single shard segment before flush hints. */
   softMaxDocs?: number;
+  /**
+   * When true (default), infer and add mappings for unknown fields on ingest.
+   * Set false for strict schema-only indexes.
+   */
+  dynamicMapping?: boolean;
 }
 
 export interface IndexDefinition {
@@ -131,6 +141,26 @@ export interface SearchQuery {
   facets?: string[];
   /** Minimum score threshold after normalization. */
   minScore?: number;
+  /** Fuzzy edit distance: false/0/1/2/"AUTO". */
+  fuzziness?: boolean | 0 | 1 | 2 | "AUTO";
+  /** Prefer phrase match (ordered terms). */
+  phrase?: boolean;
+  /** Allowed gaps between phrase terms. */
+  phraseSlop?: number;
+  /** Prefix match each query token. */
+  prefix?: boolean;
+  /** Per-field score multipliers. */
+  boosts?: Record<string, number>;
+  /** Cursor for deep pagination (document id). */
+  searchAfter?: string;
+  /** Bool subset */
+  must?: Array<{ field: string; value: string | number | boolean }>;
+  should?: Array<{ field: string; value: string | number | boolean }>;
+  mustNot?: Array<{ field: string; value: string | number | boolean }>;
+  /** Cap fuzzy/wildcard expansion (from circuit breaker). */
+  maxFuzzyCandidates?: number;
+  /** Facet modes: "field" (terms), "stats:field", "histogram:field:interval" */
+  facetKinds?: string[];
 }
 
 export interface SearchHit {

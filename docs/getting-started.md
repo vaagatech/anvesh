@@ -10,19 +10,26 @@ permalink: /getting-started/
 - Node.js **20+**
 - npm 9+ (workspaces)
 
-## Install & build
+## Fastest path — full stack
 
 ```bash
 git clone https://github.com/vaagatech/anvesh-monorepo.git
 cd anvesh-monorepo
 npm install
-npm run build
-npm run setup -- init
+npm start                 # build (if needed) → init → engine + hub + spider + indexer
+# optional demo corpus:
+npm start -- --seed
 ```
 
-## Start the engine
+Open Hub at http://127.0.0.1:3849 (`admin` / password in `.env.anvesh`). See the [Operator guide]({{ '/operator-guide/' | relative_url }}) for the Dashboard checklist.
+
+Stop with `npm run stop`.
+
+## Engine only (advanced)
 
 ```bash
+npm run build
+npm run setup -- init
 set -a; source .env.anvesh; set +a
 npm run start:engine
 # → http://127.0.0.1:3848/health
@@ -63,17 +70,16 @@ curl -s http://127.0.0.1:3848/v1/indexes/articles/search \
 ```
 
 Successful responses include a human-readable `message`, e.g.  
-`Search completed successfully. Found 1 matching document(s) in 0.3ms.`
+`Search completed. Found 1 matching document in 0.3ms.`
 
-## Optional Hub
+## Hub
+
+After `npm start`, Hub is at http://127.0.0.1:3849 with local instances pre-registered. To run Hub alone:
 
 ```bash
 npm run start -w @vaagatech/anvesh-hub
-# → http://127.0.0.1:3849
 # login: admin / (see ANVESH_HUB_ADMIN_PASSWORD in .env.anvesh)
 ```
-
-Register engine/spider/indexer instance URLs in Hub to manage indexes and jobs.
 
 ## Crawl a site, then index
 
@@ -108,6 +114,7 @@ curl -s http://127.0.0.1:3848/health
 
 ## Next
 
+- [Operator guide]({{ '/operator-guide/' | relative_url }})
 - [Architecture]({{ '/architecture/' | relative_url }})
 - [Engine component]({{ '/components/engine/' | relative_url }})
 - [Search modes]({{ '/guides/search/' | relative_url }})

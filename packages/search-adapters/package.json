@@ -1,0 +1,39 @@
+{
+  "name": "@vaagatech/anvesh-search-adapters",
+  "version": "0.2.0",
+  "description": "Search backend adapters for Anvesh — Elasticsearch, OpenSearch, Solr — by VaagaTech",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "author": "VaagaTech <info@vaagatech.com>",
+  "license": "MIT",
+  "homepage": "https://www.vaagatech.com",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vaagatech/anvesh-monorepo.git",
+    "directory": "packages/search-adapters"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.8"
+  },
+  "files": [
+    "dist"
+  ]
+}

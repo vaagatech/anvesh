@@ -15,7 +15,10 @@ import {
 } from "@vaagatech/anvesh-engine";
 import {
   crawledPageToDocument,
+  enrichIndexDocument,
   INDEXER_DEFAULT_BATCH,
+  WEB_MAPPINGS,
+  WEB_SETTINGS,
   type CrawledPage,
   type IndexDocumentPayload,
 } from "@vaagatech/anvesh-shared";
@@ -101,10 +104,10 @@ function isCrawledPage(v: unknown): v is CrawledPage {
 }
 
 function toPayload(raw: unknown): IndexDocumentPayload {
-  if (isCrawledPage(raw)) return crawledPageToDocument(raw);
+  if (isCrawledPage(raw)) return enrichIndexDocument(crawledPageToDocument(raw));
   const row = raw as IndexDocumentPayload & { fields?: Record<string, unknown> };
-  if (row.fields) return row;
-  return { fields: (raw as Record<string, unknown>) ?? {} };
+  if (row.fields) return enrichIndexDocument(row);
+  return enrichIndexDocument({ fields: (raw as Record<string, unknown>) ?? {} });
 }
 
 async function loadDocuments(inputPath: string): Promise<IndexDocumentPayload[]> {
@@ -181,15 +184,8 @@ async function indexLocal(
 
   if (createIndex) {
     try {
-      await engine.createIndex(index, {
-        title: { type: "text" },
-        body: { type: "text" },
-        url: { type: "keyword" },
-        description: { type: "text" },
-        roles: { type: "text" },
-        status: { type: "number" },
-      });
-      log.info({ index }, `Index "${index}" is ready for bulk load.`);
+      await engine.createIndex(index, { ...WEB_MAPPINGS }, { ...WEB_SETTINGS });
+      log.info({ index }, `Index "${index}" is ready for bulk load (dynamic schema).`);
     } catch (err) {
       if (!(err instanceof Error) || !/already exists/i.test(err.message)) throw err;
       log.info({ index }, `Index "${index}" already exists — appending documents.`);

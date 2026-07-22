@@ -15,6 +15,14 @@ export {
 export { createStorage, MemoryStorage, FilesystemStorage } from "./storage/index.js";
 export type { StorageAdapter, StorageKind, StorageFactoryOptions } from "./storage/index.js";
 export { createAnveshApp, listenAnvesh } from "./api/server.js";
-export { formatMessage, apiEnvelope, AnveshError } from "./messaging/vaakly.js";
+export { formatMessage, apiEnvelope, AnveshError, correctSummary, createVaaklyPlugin } from "./messaging/vaakly.js";
+export { createEnginePluginRegistry, parsePluginList, registerCustomPlugin } from "./plugins/load.js";
+export { createPluginRegistry } from "@vaagatech/anvesh-plugins";
+export type {
+  AnveshPlugin,
+  PluginRegistry,
+  PluginTool,
+  ToolDescriptor,
+} from "@vaagatech/anvesh-plugins";
 export { createLogger, logMessage } from "./logging/logger.js";
 export type * from "./types.js";
