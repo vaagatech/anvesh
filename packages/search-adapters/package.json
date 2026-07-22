@@ -1,6 +1,6 @@
 {
   "name": "@vaagatech/anvesh-search-adapters",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Search backend adapters for Anvesh — Elasticsearch, OpenSearch, Solr — by VaagaTech",
   "type": "module",
   "main": "./dist/index.js",
