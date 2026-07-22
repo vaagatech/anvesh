@@ -1,6 +1,6 @@
 {
   "name": "@vaagatech/anvesh-monorepo",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Anvesh monorepo — engine, hub, indexer, spider, setup by VaagaTech",
   "workspaces": [

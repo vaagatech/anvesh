@@ -1,6 +1,6 @@
 {
   "name": "@vaagatech/anvesh-engine",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Anvesh search engine API — full-text, semantic, geo — by VaagaTech",
   "type": "module",
   "main": "./dist/index.js",
@@ -56,8 +56,8 @@
     "@aws-sdk/lib-dynamodb": "^3.758.0",
     "@fastify/cors": "^10.0.2",
     "@fastify/rate-limit": "^10.2.2",
-    "@vaagatech/anvesh-plugins": "0.2.0",
-    "@vaagatech/vaakly": "0.2.0",
+    "@vaagatech/anvesh-plugins": "0.3.0",
+    "@vaagatech/vaakly": "0.3.0",
     "fastify": "^5.2.1",
     "ioredis": "^5.5.0",
     "mongodb": "^6.14.2",

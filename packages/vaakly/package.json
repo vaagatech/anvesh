@@ -1,6 +1,6 @@
 {
   "name": "@vaagatech/vaakly",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Vaakly messaging for Anvesh — corrected API summaries as a plugin — by VaagaTech",
   "type": "module",
   "main": "./dist/index.js",
@@ -29,7 +29,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@vaagatech/anvesh-plugins": "0.2.0"
+    "@vaagatech/anvesh-plugins": "0.3.0"
   },
   "devDependencies": {
     "@types/node": "^22.13.10",
