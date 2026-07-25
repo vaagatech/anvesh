@@ -14,12 +14,14 @@ export interface StorageAdapter {
   ping?(): Promise<boolean>;
 }
 
-export type StorageKind = "memory" | "filesystem" | "s3" | "redis" | "dynamodb" | "mongodb";
+export type StorageKind = "memory" | "filesystem" | "dfs" | "s3" | "redis" | "dynamodb" | "mongodb";
 
 export interface StorageFactoryOptions {
   kind: StorageKind;
   /** Filesystem root or local cache dir. */
   path?: string;
+  /** DFS block size in MB. */
+  blockSizeMb?: number;
   /** S3 / object store. */
   bucket?: string;
   prefix?: string;

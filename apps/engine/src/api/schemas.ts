@@ -16,8 +16,14 @@ export const createIndexSchema = z.object({
       bm25k1: z.number().positive().optional(),
       bm25b: z.number().min(0).max(1).optional(),
       vectorDimensions: z.number().int().positive().optional(),
+      vectorMetric: z.enum(["cosine", "dot_product", "euclidean"]).optional(),
+      vectorIndexType: z.enum(["flat", "hnsw"]).optional(),
+      vectorQuantization: z.enum(["none", "sq8"]).optional(),
       autoEmbed: z.boolean().optional(),
       hybridKeywordWeight: z.number().min(0).max(1).optional(),
+      rrfK: z.number().int().positive().optional(),
+      hybridRankingMode: z.enum(["linear", "rrf"]).optional(),
+      queryCacheSize: z.number().int().nonnegative().optional(),
       softMaxDocs: z.number().int().positive().optional(),
       dynamicMapping: z.boolean().optional(),
     })
@@ -60,6 +66,9 @@ export const searchSchema = z.object({
   fields: z.array(z.string()).optional(),
   vector: z.array(z.number()).optional(),
   mode: z.enum(["keyword", "semantic", "hybrid", "geo"]).optional(),
+  vectorMetric: z.enum(["cosine", "dot_product", "euclidean"]).optional(),
+  hybridRankingMode: z.enum(["linear", "rrf"]).optional(),
+  rrfK: z.number().int().positive().optional(),
   filters: z
     .array(
       z.union([

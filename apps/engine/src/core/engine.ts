@@ -5,7 +5,7 @@
 import { randomUUID } from "node:crypto";
 import { InvertedIndex, type InvertedIndexSnapshot } from "./inverted-index.js";
 import { VectorStore, type VectorStoreSnapshot } from "./vector-store.js";
-import { blendScores } from "./hybrid.js";
+import { blendScores, reciprocalRankFusion } from "./hybrid.js";
 import { assertGeoPoint, distanceFromOrigin, validateGeoQuery } from "./geo.js";
 import { localEmbed, textFromFields, meaningfulVectorHits } from "./embed.js";
 import { globalCircuits } from "./circuit.js";
@@ -44,6 +44,7 @@ export class AnveshEngine {
   private indexes = new Map<string, IndexState>();
   private dirty = new Set<string>();
   private aliases = new Map<string, string>();
+  private queryCache = new Map<string, Map<string, SearchResult>>();
 
   constructor(private readonly storage: StorageAdapter) {}
 
@@ -62,11 +63,17 @@ export class AnveshEngine {
       raw.definition.mappings,
       raw.definition.settings ?? {},
     );
+    const settings = raw.definition.settings;
     const vectors =
-      raw.vectors && raw.definition.settings?.vectorDimensions
+      raw.vectors && settings?.vectorDimensions
         ? VectorStore.fromSnapshot(raw.vectors)
-        : raw.definition.settings?.vectorDimensions
-          ? new VectorStore(raw.definition.settings.vectorDimensions)
+        : settings?.vectorDimensions
+          ? new VectorStore(
+              settings.vectorDimensions,
+              settings.vectorMetric ?? "cosine",
+              settings.vectorIndexType ?? "flat",
+              settings.vectorQuantization ?? "none",
+            )
           : null;
     return { definition: raw.definition, inverted, vectors };
   }
@@ -101,6 +108,7 @@ export class AnveshEngine {
 
   private markDirty(name: string): void {
     this.dirty.add(name);
+    this.queryCache.delete(name);
   }
 
   listIndexes(): IndexDefinition[] {
@@ -140,7 +148,12 @@ export class AnveshEngine {
     };
     const inverted = new InvertedIndex(definition.mappings, resolvedSettings);
     const vectors = settings.vectorDimensions
-      ? new VectorStore(settings.vectorDimensions)
+      ? new VectorStore(
+          settings.vectorDimensions,
+          settings.vectorMetric ?? "cosine",
+          settings.vectorIndexType ?? "flat",
+          settings.vectorQuantization ?? "none",
+        )
       : null;
     this.indexes.set(name, { definition, inverted, vectors });
     this.markDirty(name);
@@ -265,13 +278,19 @@ export class AnveshEngine {
 
   private ensureVectorStore(state: IndexState): VectorStore {
     if (!state.vectors) {
-      const dims = state.definition.settings?.vectorDimensions;
+      const s = state.definition.settings;
+      const dims = s?.vectorDimensions;
       if (!dims) {
         throw new AnveshError("ERR_VALIDATION", {
           detail: "index has no vectorDimensions; set settings.vectorDimensions to enable vectors",
         });
       }
-      state.vectors = new VectorStore(dims);
+      state.vectors = new VectorStore(
+        dims,
+        s?.vectorMetric ?? "cosine",
+        s?.vectorIndexType ?? "flat",
+        s?.vectorQuantization ?? "none",
+      );
     }
     return state.vectors;
   }
@@ -409,6 +428,16 @@ export class AnveshEngine {
   search(indexName: string, query: SearchQuery): SearchResult {
     const started = performance.now();
     const state = this.require(indexName);
+
+    // Query Cache Lookup
+    const cacheKey = JSON.stringify(query);
+    const idxCache = this.queryCache.get(indexName);
+    if (idxCache && idxCache.has(cacheKey)) {
+      const cached = idxCache.get(cacheKey)!;
+      const tookMs = Math.round((performance.now() - started) * 100) / 100;
+      return { ...cached, tookMs };
+    }
+
     globalCircuits.checkResultWindow(query.from ?? 0, query.size ?? 10);
     globalCircuits.checkMemory();
     const mode =
@@ -567,11 +596,17 @@ export class AnveshEngine {
           .map((id) => [id, state.inverted.get(id)!] as const)
           .filter(([, d]) => Boolean(d)),
       );
+      const hybridStrategy =
+        query.hybridRankingMode ?? state.definition.settings?.hybridRankingMode ?? "linear";
       const weight = state.definition.settings?.hybridKeywordWeight ?? 0.55;
-      const blended = blendScores(keywordScores, semanticScores, weight, docs);
+      const rrfK = query.rrfK ?? state.definition.settings?.rrfK ?? 60;
+      const blended =
+        hybridStrategy === "rrf"
+          ? reciprocalRankFusion(keywordScores, semanticScores, rrfK, docs)
+          : blendScores(keywordScores, semanticScores, weight, docs);
       const filtered = query.minScore
         ? blended.filter((h) => h.score >= query.minScore!)
-        : blended.filter((h) => h.score > 0.05);
+        : blended.filter((h) => h.score > 0.01);
       total = filtered.length;
       hits = filtered.slice(from, from + size).map((h) => {
         const source = this.publicDoc(h.source);
@@ -632,7 +667,23 @@ export class AnveshEngine {
       index: indexName,
     }).message;
 
-    return { tookMs, total, hits, facets, message };
+    const res: SearchResult = { tookMs, total, hits, facets, message };
+
+    // Store in query cache
+    const maxCache = state.definition.settings?.queryCacheSize ?? 100;
+    if (maxCache > 0) {
+      if (!this.queryCache.has(indexName)) {
+        this.queryCache.set(indexName, new Map());
+      }
+      const idxMap = this.queryCache.get(indexName)!;
+      if (idxMap.size >= maxCache) {
+        const firstKey = idxMap.keys().next().value;
+        if (firstKey) idxMap.delete(firstKey);
+      }
+      idxMap.set(cacheKey, res);
+    }
+
+    return res;
   }
 
   stats(): { indexes: number; documents: number; dirty: number } {

@@ -100,11 +100,24 @@
     setStatus("Searching…", "");
     resultsEl.innerHTML = "";
 
+    const modeSelect = document.getElementById("demo-mode");
+    const hybridSelect = document.getElementById("demo-hybrid-mode");
+    const mode = modeSelect ? modeSelect.value : "hybrid";
+    const hybridRankingMode = hybridSelect ? hybridSelect.value : "rrf";
+
     try {
+      const payload = { q, highlight: true, size: 10, mode };
+      if (mode === "hybrid") {
+        payload.hybridRankingMode = hybridRankingMode;
+      }
+      if (mode === "geo") {
+        payload.geo = { field: "location", origin: { lat: 12.9716, lon: 77.5946 }, distanceKm: 20 };
+      }
+
       const res = await fetch(`${base}/v1/indexes/demo/search`, {
         method: "POST",
         headers: { "content-type": "application/json", accept: "application/json" },
-        body: JSON.stringify({ q, highlight: true, size: 10 }),
+        body: JSON.stringify(payload),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {

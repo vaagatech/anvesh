@@ -14,18 +14,36 @@ permalink: /demo/
   <form id="demo-search-form" class="demo-form">
     <label>
       Engine URL
-      <input id="demo-engine-url" type="url" placeholder="https://your-engine.example" autocomplete="url" />
+      <input id="demo-engine-url" type="url" placeholder="https://your-engine.example or http://127.0.0.1:3848" autocomplete="url" />
     </label>
-    <label>
-      Query
-      <input id="demo-query" type="search" placeholder="lightweight search" value="lightweight search" required />
+    <div class="demo-row" style="display: flex; gap: 1rem; margin-top: 0.5rem;">
+      <label style="flex: 1;">
+        Search Mode
+        <select id="demo-mode" style="width: 100%; padding: 0.5rem; background: #0f172a; color: #fff; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px;">
+          <option value="keyword">BM25 Full-Text Keyword</option>
+          <option value="hybrid" selected>Hybrid (BM25 + Vector RRF)</option>
+          <option value="semantic">Semantic Vector (HNSW/SQ8)</option>
+          <option value="geo">Geo-Spatial Radius</option>
+        </select>
+      </label>
+      <label style="flex: 1;">
+        Hybrid Strategy
+        <select id="demo-hybrid-mode" style="width: 100%; padding: 0.5rem; background: #0f172a; color: #fff; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px;">
+          <option value="rrf" selected>Reciprocal Rank Fusion (RRF)</option>
+          <option value="linear">Linear Min-Max Blend</option>
+        </select>
+      </label>
+    </div>
+    <label style="margin-top: 0.5rem; display: block;">
+      Query String
+      <input id="demo-query" type="search" placeholder="lightweight vector search engine" value="lightweight vector search engine" required />
     </label>
-    <div class="demo-actions">
+    <div class="demo-actions" style="margin-top: 0.75rem;">
       <button type="submit">Search</button>
       <div class="demo-suggest" aria-label="Sample queries">
         <button type="button" data-demo-q="lightweight search">lightweight</button>
+        <button type="button" data-demo-q="vector db hnsw">vector db</button>
         <button type="button" data-demo-q="hub rbac">hub rbac</button>
-        <button type="button" data-demo-q="geo">geo</button>
         <button type="button" data-demo-q="spider crawl">spider</button>
       </div>
     </div>

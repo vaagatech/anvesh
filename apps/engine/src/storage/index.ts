@@ -1,5 +1,6 @@
 import { MemoryStorage } from "./memory.js";
 import { FilesystemStorage } from "./filesystem.js";
+import { DfsStorage } from "./dfs.js";
 import { S3Storage } from "./s3.js";
 import { RedisStorage } from "./redis.js";
 import { DynamoDBStorage } from "./dynamodb.js";
@@ -13,6 +14,11 @@ export function createStorage(options: StorageFactoryOptions): StorageAdapter {
       return new MemoryStorage();
     case "filesystem":
       return new FilesystemStorage(options.path ?? process.env.ANVESH_DATA_DIR ?? ".anvesh/data");
+    case "dfs":
+      return new DfsStorage({
+        path: options.path ?? process.env.ANVESH_DFS_PATH ?? ".anvesh/dfs",
+        blockSizeMb: options.blockSizeMb,
+      });
     case "s3":
       if (!options.bucket && !process.env.ANVESH_S3_BUCKET) {
         throw new AnveshError("ERR_VALIDATION", { detail: "S3 storage requires bucket" });
@@ -53,6 +59,7 @@ export function createStorage(options: StorageFactoryOptions): StorageAdapter {
 export * from "./types.js";
 export * from "./memory.js";
 export * from "./filesystem.js";
+export * from "./dfs.js";
 export * from "./s3.js";
 export * from "./redis.js";
 export * from "./dynamodb.js";

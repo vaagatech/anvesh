@@ -43,6 +43,11 @@ export interface FieldMapping {
   analyzer?: string;
 }
 
+export type VectorMetric = "cosine" | "dot_product" | "euclidean";
+export type VectorIndexType = "flat" | "hnsw";
+export type VectorQuantization = "none" | "sq8";
+export type HybridRankingMode = "linear" | "rrf";
+
 export interface IndexSettings {
   /** BM25 k1 (term frequency saturation). Default 1.2 */
   bm25k1?: number;
@@ -50,6 +55,12 @@ export interface IndexSettings {
   bm25b?: number;
   /** Expected vector dimensions when using semantic search. */
   vectorDimensions?: number;
+  /** Vector similarity metric: cosine (default), dot_product, euclidean. */
+  vectorMetric?: VectorMetric;
+  /** Vector index structure: flat (default), hnsw. */
+  vectorIndexType?: VectorIndexType;
+  /** Quantization for vector memory compression: none (default), sq8. */
+  vectorQuantization?: VectorQuantization;
   /**
    * When true (default if vectorDimensions set), embed text fields / queries
    * locally if no vector is provided.
@@ -57,6 +68,12 @@ export interface IndexSettings {
   autoEmbed?: boolean;
   /** Hybrid blend: weight for keyword score (0–1). Semantic gets 1 - keywordWeight. */
   hybridKeywordWeight?: number;
+  /** RRF constant for Reciprocal Rank Fusion hybrid scoring. Default 60. */
+  rrfK?: number;
+  /** Hybrid search strategy: "linear" min-max blend or "rrf" reciprocal rank fusion. Default "linear". */
+  hybridRankingMode?: HybridRankingMode;
+  /** Max LRU cached search results per index segment. Default 100. */
+  queryCacheSize?: number;
   /** Max documents kept in a single shard segment before flush hints. */
   softMaxDocs?: number;
   /**
@@ -132,6 +149,12 @@ export interface SearchQuery {
   vector?: number[];
   /** keyword | semantic | hybrid | geo */
   mode?: "keyword" | "semantic" | "hybrid" | "geo";
+  /** Override vector distance metric: cosine | dot_product | euclidean */
+  vectorMetric?: VectorMetric;
+  /** Hybrid strategy: "linear" | "rrf" */
+  hybridRankingMode?: HybridRankingMode;
+  /** Reciprocal Rank Fusion constant K when hybridRankingMode is "rrf". Default 60. */
+  rrfK?: number;
   filters?: Array<TermFilter | RangeFilter>;
   /** Location filter / distance sort (radius, bounding box). */
   geo?: GeoQuery;

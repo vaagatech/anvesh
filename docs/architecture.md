@@ -59,11 +59,13 @@ anvesh/
 ## Engine internals (summary)
 
 1. **Analyzer** — tokenize, stopwords, light stem.
-2. **Inverted index** — term postings + BM25.
-3. **Vector store** — dense embeddings + cosine similarity.
+2. **Inverted index** — term postings + BM25 scoring + fuzzy Levenshtein distance.
+3. **Vector DB store** — dense embeddings + multi-metric (cosine, dot product, euclidean) + HNSW ANN graph + SQ8 8-bit scalar quantization.
 4. **Geo** — haversine radius + bounding box on `geo_point` fields.
-5. **Hybrid** — min-max blend of keyword + semantic scores.
-6. **Storage adapter** — serializes index snapshots (JSON blobs).
+5. **Hybrid search** — linear min-max blend and Reciprocal Rank Fusion (RRF).
+6. **LRU Query Cache** — sub-millisecond query result caching (<0.1ms).
+7. **Storage adapters** — serializes index snapshots across memory, filesystem, DFS (block chunking), S3, Redis, DynamoDB, MongoDB.
+8. **Distributed Cluster Coordinator** — scatter-gather multi-node routing, document FNV-1a hash partitioning, and map-reduce facet/hit aggregation.
 
 On each mutation the engine marks the index dirty and flushes to storage. On startup it hydrates all indexes from storage into memory.
 

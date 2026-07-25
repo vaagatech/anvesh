@@ -19,35 +19,35 @@ export const STORAGE_KEY = "anvesh.hub.appearance";
 export const DEFAULT_APPEARANCE: AppearanceState = {
   theme: "vaagatech",
   fontPack: "vaagatech",
-  accent: "#1d4ed8",
+  accent: "#38bdf8",
   density: "comfortable",
   motion: "full",
 };
 
 const FONT_HREF: Record<FontPackId, string> = {
   vaagatech:
-    "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap",
+    "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap",
   editorial:
-    "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Source+Code+Pro:wght@400;500&family=Source+Sans+3:wght@400;500;600;700&display=swap",
+    "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap",
   technical:
-    "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap",
+    "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap",
 };
 
 const FONT_VARS: Record<FontPackId, { font: string; display: string; mono: string }> = {
   vaagatech: {
-    font: '"IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
-    display: '"IBM Plex Sans", ui-sans-serif, system-ui, sans-serif',
-    mono: '"IBM Plex Mono", ui-monospace, monospace',
+    font: '"Plus Jakarta Sans", -apple-system, system-ui, sans-serif',
+    display: '"Plus Jakarta Sans", -apple-system, system-ui, sans-serif',
+    mono: '"JetBrains Mono", ui-monospace, monospace',
   },
   editorial: {
-    font: '"Source Sans 3", system-ui, sans-serif',
-    display: '"Fraunces", "Source Sans 3", serif',
-    mono: '"Source Code Pro", ui-monospace, Menlo, monospace',
+    font: '"Plus Jakarta Sans", system-ui, sans-serif',
+    display: '"Fraunces", serif',
+    mono: '"JetBrains Mono", ui-monospace, monospace',
   },
   technical: {
-    font: '"IBM Plex Sans", system-ui, sans-serif',
-    display: '"Space Grotesk", "IBM Plex Sans", sans-serif',
-    mono: '"IBM Plex Mono", ui-monospace, Menlo, monospace',
+    font: '"Plus Jakarta Sans", system-ui, sans-serif',
+    display: '"Space Grotesk", sans-serif',
+    mono: '"JetBrains Mono", ui-monospace, monospace',
   },
 };
 

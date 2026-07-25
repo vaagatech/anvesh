@@ -1,5 +1,6 @@
 /**
- * Hybrid ranking — blend BM25 and cosine similarity with min-max normalization.
+ * Hybrid ranking — blend BM25 and vector similarity using min-max linear weighting
+ * or Reciprocal Rank Fusion (RRF).
  */
 
 import type { DocumentId, SearchHit, AnveshDocument } from "../types.js";
@@ -36,6 +37,51 @@ export function blendScores(
     const doc = documents.get(id);
     if (!doc) continue;
     const score = w * (kw.get(id) ?? 0) + (1 - w) * (sem.get(id) ?? 0);
+    hits.push({ id, score, source: doc });
+  }
+
+  hits.sort((a, b) => b.score - a.score);
+  return hits;
+}
+
+/**
+ * Reciprocal Rank Fusion (RRF) algorithm:
+ * RRF_score(d) = sum(1 / (k + rank(d, r))) across all rank lists r.
+ */
+export function reciprocalRankFusion(
+  keywordScores: Map<DocumentId, number>,
+  semanticScores: Map<DocumentId, number>,
+  rrfK = 60,
+  documents: Map<DocumentId, AnveshDocument>,
+): SearchHit[] {
+  // Sort keyword IDs by score desc
+  const sortedKeyword = [...keywordScores.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([id]) => id);
+
+  // Sort semantic IDs by score desc
+  const sortedSemantic = [...semanticScores.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([id]) => id);
+
+  const rrfScores = new Map<DocumentId, number>();
+
+  sortedKeyword.forEach((id, index) => {
+    const rank = index + 1;
+    const current = rrfScores.get(id) ?? 0;
+    rrfScores.set(id, current + 1 / (rrfK + rank));
+  });
+
+  sortedSemantic.forEach((id, index) => {
+    const rank = index + 1;
+    const current = rrfScores.get(id) ?? 0;
+    rrfScores.set(id, current + 1 / (rrfK + rank));
+  });
+
+  const hits: SearchHit[] = [];
+  for (const [id, score] of rrfScores) {
+    const doc = documents.get(id);
+    if (!doc) continue;
     hits.push({ id, score, source: doc });
   }
 

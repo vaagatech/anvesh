@@ -4,15 +4,15 @@
 [![license](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
 
-**Lightweight search stack in Node.js** — engine, hub (RBAC control plane), indexer, spider, and setup — by [VaagaTech](https://www.vaagatech.com).
+**Lightweight enterprise-grade search engine & vector database in Node.js** — BM25 full-text, multi-metric vector DB (HNSW, SQ8), hybrid RRF scoring, sub-millisecond caching, distributed file system (DFS) storage, scatter-gather clustering, hub control plane (RBAC), indexer, spider, and setup — by [VaagaTech](https://www.vaagatech.com).
 
 **Docs:** [vaagatech.github.io/anvesh-monorepo](https://vaagatech.github.io/anvesh-monorepo/) · enable Pages from `/docs` ([guide](./docs/github-pages.md))
 
-**Start here:** [Why Anvesh](./docs/why-anvesh.md) · [Use cases](./docs/use-cases.md) · [Versioning](./docs/versioning.md)
+**Start here:** [Product Features](./docs/features.md) · [Market Comparison](./docs/market-comparison.md) · [Why Anvesh](./docs/why-anvesh.md) · [Use cases](./docs/use-cases.md)
 
 | Package | Role |
 |---------|------|
-| `@vaagatech/anvesh-engine` | Search API (BM25, vectors, geo) |
+| `@vaagatech/anvesh-engine` | Search & Vector DB API (BM25, HNSW, SQ8, RRF, DFS, Geo) |
 | `@vaagatech/anvesh-hub` | Control plane + modern UI (RBAC, multi-instance) |
 | `@vaagatech/anvesh-indexer` | Bulk indexer (+ `serve` worker) |
 | `@vaagatech/anvesh-spider` | Site crawler (+ `serve` worker, role-based login) |

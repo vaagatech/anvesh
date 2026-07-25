@@ -13,7 +13,9 @@ Built by [VaagaTech](https://www.vaagatech.com). Open source (MIT). One `npm sta
 
 | You get | Without |
 |---------|---------|
-| Full-text (BM25), vectors, hybrid, geo | A JVM cluster to babysit |
+| Full-text (BM25), Vector DB (HNSW, SQ8), hybrid RRF, geo | A heavy JVM cluster to babysit |
+| Nano-to-millisecond performance + LRU query caching | Paying per-query SaaS fees |
+| Distributed File System (DFS) chunking & Scatter-Gather clustering | Complex Zookeeper/Raft orchestration |
 | Crawl → index → search in one monorepo | Separate crawler + ETL + search SaaS |
 | Hub UI with RBAC for operators | “Just curl the API and hope” |
 | Adapters to ES / OpenSearch / Solr when you outgrow native | A rewrite when requirements change |
