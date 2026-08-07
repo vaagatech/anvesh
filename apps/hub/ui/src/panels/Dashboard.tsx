@@ -11,8 +11,7 @@ type Tab =
   | "indexer"
   | "jobs"
   | "audit"
-  | "users"
-  | "appearance";
+  | "users";
 
 export function DashboardPanel({
   engines,
@@ -34,7 +33,7 @@ export function DashboardPanel({
   indexCount: number;
 }) {
   const [fleet, setFleet] = useState<FleetHealthRow[]>([]);
-  const [fleetMsg, setFleetMsg] = useState("Checking fleet…");
+  const [fleetMsg, setFleetMsg] = useState("Checking cluster fleet…");
   const [checking, setChecking] = useState(false);
 
   const running = useMemo(
@@ -43,43 +42,6 @@ export function DashboardPanel({
   );
   const failed = useMemo(() => jobs.filter((j) => j.status === "failed").slice(0, 5), [jobs]);
   const online = fleet.filter((f) => f.ok).length;
-
-  const enabledCore = fleet.filter(
-    (f) => f.enabled && (f.kind === "engine" || f.kind === "spider" || f.kind === "indexer"),
-  );
-  const fleetHealthy =
-    enabledCore.length >= 3 && enabledCore.every((f) => f.ok);
-  const crawlDone = jobs.some((j) => j.kind === "spider" && j.status === "completed");
-
-  const steps = [
-    {
-      done: fleetHealthy,
-      title: "Fleet healthy",
-      detail: "Engine, spider, and indexer reachable (auto-seeded after npm start)",
-      tab: "instances" as Tab,
-    },
-    {
-      done: indexCount > 0,
-      title: "Create an index",
-      detail: "Indexes tab — dynamic schema (optional mappings) with vectors (256) and auto-embed",
-      tab: "indexes" as Tab,
-    },
-    {
-      done: crawlDone,
-      title: "Crawl a site",
-      detail: "Crawl tab — pick or type an index, then Run (auto-index, no files)",
-      tab: "spider" as Tab,
-    },
-    {
-      done: false,
-      title: "Search your content",
-      detail: "Hybrid search with highlights — try fuzzy, phrase, or prefix toggles",
-      tab: "search" as Tab,
-      always: true,
-    },
-  ];
-
-  const setupDone = fleetHealthy && indexCount > 0 && crawlDone;
 
   async function checkFleet() {
     setChecking(true);
@@ -101,60 +63,48 @@ export function DashboardPanel({
   }, [instances.length]);
 
   return (
-    <>
-      {!setupDone && (
-        <section className="panel hero-panel">
-          <p className="eyebrow">Getting started</p>
-          <h2 className="hero-title">
-            {indexCount === 0 && fleetHealthy
-              ? "Create an index, then crawl"
-              : "Indexes → Crawl → Search"}
-          </h2>
-          <p className="hint">
-            {fleetHealthy
-              ? "Local fleet is online. Follow the checklist — no manual instance registration needed."
-              : "Waiting for engine, spider, and indexer. Run npm start from the repo root if the stack is down."}
+    <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+      {/* Metrics Row */}
+      <div className="stats-grid">
+        <div className="stat-card">
+          <p className="stat-label">Fleet Status</p>
+          <p className="stat-value" style={{ color: online === fleet.length && fleet.length > 0 ? "var(--status-ok)" : "var(--signal-gold)" }}>
+            {online} / {fleet.length || instances.length}
           </p>
-          {indexCount === 0 && fleetHealthy && (
-            <div className="row" style={{ marginBottom: "1rem" }}>
-              <button type="button" className="btn" onClick={() => onNavigate("indexes")}>
-                Create index
-              </button>
-              <button type="button" className="btn secondary" onClick={() => onNavigate("documents")}>
-                Seed demo data
-              </button>
-            </div>
-          )}
-          {indexCount === 0 && fleetHealthy && (
-            <p className="hint" style={{ marginTop: "-0.5rem", marginBottom: "1rem" }}>
-              Demo seed: run <code>npm run demo:seed</code> from the repo root, then browse Documents or
-              Search.
-            </p>
-          )}
-          <ol className="setup-list">
-            {steps.map((s) => (
-              <li key={s.title} className={s.done ? "done" : ""}>
-                <div>
-                  <strong>{s.title}</strong>
-                  <span>{s.detail}</span>
-                </div>
-                {!s.done && (
-                  <button type="button" className="btn secondary" onClick={() => onNavigate(s.tab)}>
-                    Open
-                  </button>
-                )}
-                {s.done && <span className="badge ok">done</span>}
-              </li>
-            ))}
-          </ol>
-        </section>
-      )}
+          <p className="stat-detail">Active Nodes Reachable</p>
+        </div>
 
+        <div className="stat-card">
+          <p className="stat-label">Active Engine Indexes</p>
+          <p className="stat-value" style={{ color: "var(--cobalt-bright)" }}>
+            {indexCount}
+          </p>
+          <p className="stat-detail">Configured Indexes</p>
+        </div>
+
+        <div className="stat-card">
+          <p className="stat-label">Active Job Queue</p>
+          <p className="stat-value" style={{ color: running.length > 0 ? "var(--signal-gold)" : "var(--text-muted)" }}>
+            {running.length}
+          </p>
+          <p className="stat-detail">Running / Queued Tasks</p>
+        </div>
+
+        <div className="stat-card">
+          <p className="stat-label">Recent Failures</p>
+          <p className="stat-value" style={{ color: failed.length > 0 ? "var(--status-err)" : "var(--status-ok)" }}>
+            {failed.length}
+          </p>
+          <p className="stat-detail">Job Errors Logged</p>
+        </div>
+      </div>
+
+      {/* Cluster Node Health Cards */}
       <section className="panel">
         <div className="panel-head">
           <div>
-            <h2>Fleet health</h2>
-            <p className="hint">{fleetMsg}</p>
+            <h2>Cluster Node Health</h2>
+            <p className="hint" style={{ margin: 0 }}>{fleetMsg}</p>
           </div>
           <button
             type="button"
@@ -162,154 +112,197 @@ export function DashboardPanel({
             disabled={checking}
             onClick={() => void checkFleet()}
           >
-            {checking ? "Checking…" : "↻ Recheck"}
+            {checking ? "Checking…" : "↻ Recheck Nodes"}
           </button>
         </div>
-        <div className="stat-row">
-          <div className="stat">
-            <strong>
-              {online}/{fleet.length || instances.length}
-            </strong>
-            <span>Online</span>
-          </div>
-          <div className="stat">
-            <strong>{running.length}</strong>
-            <span>Running jobs</span>
-          </div>
-          <div className="stat">
-            <strong>{failed.length}</strong>
-            <span>Recent failures</span>
-          </div>
-          <div className="stat">
-            <strong>{indexCount}</strong>
-            <span>Indexes (active engine)</span>
-          </div>
-        </div>
-        {fleet.length > 0 ? (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Instance</th>
-                <th>Kind</th>
-                <th>Status</th>
-                <th>Latency</th>
-              </tr>
-            </thead>
-            <tbody>
-              {fleet.map((f) => (
-                <tr key={f.id}>
-                  <td>
-                    <strong>{f.name}</strong>
-                    {!f.enabled && <span className="badge muted"> disabled</span>}
-                  </td>
-                  <td>
-                    <span className="badge accent">{f.kind}</span>
-                  </td>
-                  <td>
+
+        {fleet.length === 0 ? (
+          <p className="hint">No registered nodes found. Add nodes under Instances.</p>
+        ) : (
+          <div className="grid-3" style={{ marginTop: "1rem" }}>
+            {fleet.map((f) => (
+              <div
+                key={f.id}
+                style={{
+                  background: "var(--bg-input)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius-md)",
+                  padding: "1.25rem",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                  gap: "1rem",
+                }}
+              >
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+                    <strong style={{ fontSize: "1rem", color: "#ffffff" }}>{f.name}</strong>
                     <span className={`badge ${f.ok ? "ok" : "err"}`}>
                       {f.ok ? "online" : "offline"}
                     </span>
-                    <span className="hint"> {f.message}</span>
-                  </td>
-                  <td>{f.ok ? `${f.latencyMs} ms` : "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <p className="hint">
-            No instances yet. Run <code>npm start</code> to auto-seed the local fleet, or register workers
-            under Instances.
-          </p>
+                  </div>
+                  <div style={{ display: "flex", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                    <span className="badge" style={{ color: "var(--cobalt-bright)", borderColor: "var(--border)" }}>{f.kind}</span>
+                    {f.latencyMs != null && (
+                      <span className="badge" style={{ fontFamily: "var(--font-mono)", fontSize: "0.75rem" }}>
+                        ⚡ {f.latencyMs} ms
+                      </span>
+                    )}
+                  </div>
+                  <p style={{ fontSize: "0.8rem", color: "var(--text-subtle)", fontFamily: "var(--font-mono)", margin: 0 }}>
+                    {f.baseUrl}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className="btn secondary"
+                  style={{ padding: "0.35rem 0.65rem", fontSize: "0.8rem", width: "100%" }}
+                  onClick={() => onNavigate("instances")}
+                >
+                  Manage Node →
+                </button>
+              </div>
+            ))}
+          </div>
         )}
       </section>
 
+      {/* Quick Launch Action Cards */}
       <section className="panel">
         <div className="panel-head">
-          <h2>Quick actions</h2>
+          <h2>Quick Actions</h2>
         </div>
-        <div className="action-grid">
-          <button type="button" className="action-card" onClick={() => onNavigate("indexes")}>
-            <strong>Create index</strong>
-            <span>Dynamic schema with hybrid search ready defaults</span>
-          </button>
-          <button type="button" className="action-card" onClick={() => onNavigate("spider")}>
-            <strong>Crawl a site</strong>
-            <span>Crawl tab — auto-index pages into your engine</span>
-          </button>
-          <button type="button" className="action-card" onClick={() => onNavigate("search")}>
-            <strong>Search</strong>
-            <span>Keyword, hybrid, geo — with highlights</span>
-          </button>
-          <button type="button" className="action-card" onClick={() => onNavigate("jobs")}>
-            <strong>Watch jobs</strong>
-            <span>
-              {running.length
-                ? `${running.length} running — open logs`
-                : "Pipeline history and crawl logs"}
-            </span>
-          </button>
+        <div className="grid-4">
+          <div
+            className="stat-card"
+            style={{ cursor: "pointer" }}
+            onClick={() => onNavigate("search")}
+          >
+            <p className="font-label" style={{ color: "var(--cobalt-bright)" }}>Search Studio</p>
+            <h3 style={{ marginTop: "0.5rem" }}>Hybrid Search</h3>
+            <p style={{ fontSize: "0.85rem", marginTop: "0.3rem" }}>Run phrase, fuzzy, BM25, and semantic queries.</p>
+          </div>
+
+          <div
+            className="stat-card"
+            style={{ cursor: "pointer" }}
+            onClick={() => onNavigate("spider")}
+          >
+            <p className="font-label" style={{ color: "var(--signal-gold)" }}>Web Crawler</p>
+            <h3 style={{ marginTop: "0.5rem" }}>Run Spider</h3>
+            <p style={{ fontSize: "0.85rem", marginTop: "0.3rem" }}>Crawl sitemaps and auto-index websites.</p>
+          </div>
+
+          <div
+            className="stat-card"
+            style={{ cursor: "pointer" }}
+            onClick={() => onNavigate("indexes")}
+          >
+            <p className="font-label" style={{ color: "var(--status-ok)" }}>Index Manager</p>
+            <h3 style={{ marginTop: "0.5rem" }}>Create Index</h3>
+            <p style={{ fontSize: "0.85rem", marginTop: "0.3rem" }}>Build custom field schemas & vector settings.</p>
+          </div>
+
+          <div
+            className="stat-card"
+            style={{ cursor: "pointer" }}
+            onClick={() => onNavigate("indexer")}
+          >
+            <p className="font-label" style={{ color: "var(--text-muted)" }}>Data Pipeline</p>
+            <h3 style={{ marginTop: "0.5rem" }}>Bulk Ingestion</h3>
+            <p style={{ fontSize: "0.85rem", marginTop: "0.3rem" }}>Import JSON payloads or NDJSON stream files.</p>
+          </div>
         </div>
-        {engineId && engines.length > 0 && (
-          <p className="hint">
-            Active engine context is set. Indexes, Documents, and Search share it.
-          </p>
-        )}
       </section>
 
-      {failed.length > 0 && (
-        <section className="panel">
+      {/* Recent Activity Cards Grid */}
+      <div className="grid-2">
+        {/* Recent Jobs Card */}
+        <section className="panel" style={{ margin: 0 }}>
           <div className="panel-head">
-            <h2>Needs attention</h2>
+            <h2>Recent Job Queue</h2>
             <button type="button" className="btn ghost" onClick={() => onNavigate("jobs")}>
-              Jobs →
+              View All →
             </button>
           </div>
-          <ul className="attention-list">
-            {failed.map((j) => (
-              <li key={j.id}>
-                <span className="badge err">{j.kind}</span> {j.configName ?? j.id}: {j.message}
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {auditEntries.length > 0 && (
-        <section className="panel">
-          <div className="panel-head">
-            <h2>Recent activity</h2>
-            <button type="button" className="btn ghost" onClick={() => onNavigate("audit")}>
-              Audit →
-            </button>
-          </div>
-          <table className="table">
-            <thead>
-              <tr>
-                <th>When</th>
-                <th>Actor</th>
-                <th>Action</th>
-                <th>Result</th>
-              </tr>
-            </thead>
-            <tbody>
-              {auditEntries.slice(0, 6).map((e) => (
-                <tr key={e.id}>
-                  <td>{new Date(e.at).toLocaleString()}</td>
-                  <td>{e.actorName ?? "—"}</td>
-                  <td>
-                    {e.action}
-                    {e.target ? ` · ${e.target}` : ""}
-                  </td>
-                  <td>
-                    <span className={`badge ${e.ok ? "ok" : "err"}`}>{e.ok ? "ok" : "fail"}</span>
-                  </td>
-                </tr>
+          {jobs.length === 0 ? (
+            <p className="hint">No background jobs executed yet.</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              {jobs.slice(0, 5).map((j) => (
+                <div
+                  key={j.id}
+                  style={{
+                    background: "var(--bg-input)",
+                    border: "1px solid var(--border)",
+                    borderRadius: "var(--radius-sm)",
+                    padding: "0.75rem 1rem",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <span className="badge" style={{ color: "var(--cobalt-bright)" }}>{j.kind}</span>
+                      <strong style={{ fontSize: "0.88rem", color: "#ffffff" }}>{j.configName || j.id}</strong>
+                    </div>
+                    <p style={{ fontSize: "0.8rem", color: "var(--text-subtle)", margin: "0.2rem 0 0 0" }}>
+                      {j.message}
+                    </p>
+                  </div>
+                  <span className={`badge ${j.status === "completed" ? "ok" : j.status === "failed" ? "err" : "warn"}`}>
+                    {j.status}
+                  </span>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+          )}
         </section>
-      )}
-    </>
+
+        {/* Security Audit Card */}
+        <section className="panel" style={{ margin: 0 }}>
+          <div className="panel-head">
+            <h2>Audit Trail</h2>
+            <button type="button" className="btn ghost" onClick={() => onNavigate("audit")}>
+              View All →
+            </button>
+          </div>
+          {auditEntries.length === 0 ? (
+            <p className="hint">No audit entries logged.</p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
+              {auditEntries.slice(0, 5).map((e) => (
+                <div
+                  key={e.id}
+                  style={{
+                    background: "var(--bg-input)",
+                    border: "1px solid var(--border)",
+                    borderRadius: "var(--radius-sm)",
+                    padding: "0.75rem 1rem",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                      <span className="badge" style={{ color: "var(--signal-gold)" }}>{e.action}</span>
+                      <strong style={{ fontSize: "0.88rem", color: "#ffffff" }}>{e.actorName || "system"}</strong>
+                    </div>
+                    <p style={{ fontSize: "0.78rem", color: "var(--text-subtle)", fontFamily: "var(--font-mono)", margin: "0.2rem 0 0 0" }}>
+                      {new Date(e.at).toLocaleString()}
+                    </p>
+                  </div>
+                  <span className={`badge ${e.ok ? "ok" : "err"}`}>
+                    {e.ok ? "success" : "failed"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+    </div>
   );
 }

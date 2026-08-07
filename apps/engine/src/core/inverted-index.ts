@@ -234,10 +234,17 @@ export class InvertedIndex {
         return fieldPostings.has(term) ? [{ term, distance: 0 }] : [];
       }
       const out: Array<{ term: string; distance: number }> = [];
-      if (fieldPostings.has(term)) out.push({ term, distance: 0 });
+      const hasExact = fieldPostings.has(term);
+      if (hasExact) {
+        out.push({ term, distance: 0 });
+        if (options.fuzziness === undefined || options.fuzziness === "AUTO") {
+          return out;
+        }
+      }
       for (const dictTerm of fieldPostings.keys()) {
         if (dictTerm === term) continue;
         if (Math.abs(dictTerm.length - term.length) > maxDist) continue;
+        if (maxDist === 1 && dictTerm[0] !== term[0]) continue;
         const d = levenshtein(term, dictTerm);
         if (d > 0 && d <= maxDist) out.push({ term: dictTerm, distance: d });
         if (out.length >= fuzzyCap) {
@@ -258,10 +265,13 @@ export class InvertedIndex {
 
       if (options.phrase && tokens.length > 1 && !hasWildcard) {
         const slop = options.phraseSlop ?? 0;
-        for (const [docId, doc] of this.documents) {
-          if (!this.matchesFilters(doc, options.filters, options.geo)) continue;
-          const first = fieldPostings.get(tokens[0]!);
-          if (!first) continue;
+        const firstTermPostings = fieldPostings.get(tokens[0]!);
+        if (!firstTermPostings) continue;
+
+        for (const firstPost of firstTermPostings) {
+          const docId = firstPost.docId;
+          const doc = this.documents.get(docId);
+          if (!doc || !this.matchesFilters(doc, options.filters, options.geo)) continue;
           const positionsByTerm = tokens.map((t) => {
             const posts = fieldPostings.get(t)?.filter((p) => p.docId === docId) ?? [];
             return posts.flatMap((p) => p.positions);
@@ -320,8 +330,27 @@ export class InvertedIndex {
     }
 
     const minScore = options.minScore ?? 0;
+    const lowerQuery = query.toLowerCase();
+
     let ranked = [...scores.entries()]
       .filter(([, s]) => s >= minScore)
+      .map(([id, s]) => {
+        let boosted = s;
+        // Exact Phrase Boost
+        if (!hasWildcard && tokens.length > 1) {
+          const doc = this.documents.get(id);
+          if (doc) {
+            for (const field of fields) {
+              const text = fieldToText(doc.fields[field]);
+              if (text && text.toLowerCase().includes(lowerQuery)) {
+                boosted *= 1.5;
+                break;
+              }
+            }
+          }
+        }
+        return [id, boosted] as [string, number];
+      })
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 
     if (options.searchAfter) {

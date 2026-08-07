@@ -6,6 +6,7 @@ import Fastify, {
 } from "fastify";
 import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
+import helmet from "@fastify/helmet";
 import { AnveshEngine } from "../core/engine.js";
 import { globalCircuits } from "../core/circuit.js";
 import { AnveshError, apiEnvelope, formatMessage } from "../messaging/vaakly.js";
@@ -85,6 +86,11 @@ export async function createAnveshApp(options: AnveshServerOptions = {}): Promis
     bodyLimit: maxBody,
     requestIdHeader: "x-request-id",
     genReqId: () => randomUUID(),
+  });
+
+  await app.register(helmet, {
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
   });
 
   app.setErrorHandler((err, req, reply) => {
@@ -188,6 +194,19 @@ export async function createAnveshApp(options: AnveshServerOptions = {}): Promis
       vendor: "VaagaTech",
       product: "Anvesh",
     }, { uptimeMs, storage: storage.name });
+  });
+
+  app.get("/debug/heap", async (req, reply) => {
+    if (options.apiKey) {
+      if (!req.headers.authorization || !timingSafeEqual(req.headers.authorization, `Bearer ${options.apiKey}`)) {
+        return reply.status(401).send({ ok: false, message: "Unauthorized" });
+      }
+    }
+    const { getHeapSnapshot } = await import("node:v8");
+    const snapshotStream = getHeapSnapshot();
+    reply.header("Content-Type", "application/json");
+    reply.header("Content-Disposition", `attachment; filename="heap-${Date.now()}.heapsnapshot"`);
+    return reply.send(snapshotStream);
   });
 
   app.get("/ready", async (_req, reply) => {
@@ -524,5 +543,23 @@ export async function listenAnvesh(
     { port, host, product: "anvesh", vendor: "vaagatech" },
     `Anvesh is listening on http://${host}:${port} — by VaagaTech`,
   );
+
+  const gracefulShutdown = async () => {
+    getLogger().info("Shutting down Engine server gracefully...");
+    await app.close();
+    process.exit(0);
+  };
+  process.on("SIGINT", gracefulShutdown);
+  process.on("SIGTERM", gracefulShutdown);
+
+  process.on("uncaughtException", (err) => {
+    getLogger().error({ err }, "Engine uncaughtException");
+    process.exit(1);
+  });
+  process.on("unhandledRejection", (err) => {
+    getLogger().error({ err }, "Engine unhandledRejection");
+    process.exit(1);
+  });
+
   return app;
 }

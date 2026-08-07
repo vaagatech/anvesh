@@ -117,7 +117,7 @@ async function loadDocuments(inputPath: string): Promise<IndexDocumentPayload[]>
   if (stat.isDirectory()) {
     const entries = await readdir(abs);
     for (const e of entries) {
-      if (e.endsWith(".json") || e.endsWith(".jsonl")) files.push(path.join(abs, e));
+      if (e.endsWith(".json") || e.endsWith(".jsonl") || e.endsWith(".ndjson")) files.push(path.join(abs, e));
     }
   } else {
     files.push(abs);
@@ -126,7 +126,7 @@ async function loadDocuments(inputPath: string): Promise<IndexDocumentPayload[]>
   const docs: IndexDocumentPayload[] = [];
   for (const file of files) {
     const text = await readFile(file, "utf8");
-    if (file.endsWith(".jsonl")) {
+    if (file.endsWith(".jsonl") || file.endsWith(".ndjson")) {
       for (const line of text.split("\n")) {
         const trimmed = line.trim();
         if (!trimmed) continue;

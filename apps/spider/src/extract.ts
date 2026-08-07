@@ -125,7 +125,20 @@ export function extractPage(html: string, baseUrl: string): ExtractedPage {
   }
 
   const body = document.body ?? document.documentElement;
-  const text = (body?.textContent ?? "")
+  
+  function getText(node: any): string {
+    if (node.nodeType === 3) return node.nodeValue || "";
+    if (node.nodeType !== 1) return "";
+    const tag = (node.tagName || "").toUpperCase();
+    const isBlock = /^(DIV|P|H1|H2|H3|H4|H5|H6|LI|TR|TD|TH|BR|SECTION|ARTICLE|ASIDE|NAV|HEADER|FOOTER|UL|OL|DL|DD|DT)$/.test(tag);
+    let res = isBlock ? " " : "";
+    for (const child of node.childNodes) {
+      res += getText(child);
+    }
+    return res + (isBlock ? " " : "");
+  }
+
+  const text = getText(body)
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 200_000);

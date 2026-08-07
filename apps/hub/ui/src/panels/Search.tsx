@@ -330,8 +330,8 @@ export function SearchPanel({
           return (
             <article key={hit.id} className="hit">
               <div className="hit-rank">#{from + i + 1}</div>
-              <h3>{title}</h3>
-              {body ? <p>{body.length > 220 ? `${body.slice(0, 220)}…` : body}</p> : null}
+              <h3 dangerouslySetInnerHTML={{ __html: title }} />
+              {body ? <p dangerouslySetInnerHTML={{ __html: body.length > 220 ? `${body.slice(0, 220)}…` : body }} /> : null}
               <div
                 className="score-bar"
                 title={`score ${Number(hit.score).toFixed(3)}`}

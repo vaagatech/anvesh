@@ -55,6 +55,7 @@
     "@aws-sdk/client-s3": "^3.758.0",
     "@aws-sdk/lib-dynamodb": "^3.758.0",
     "@fastify/cors": "^10.0.2",
+    "@fastify/helmet": "^13.1.0",
     "@fastify/rate-limit": "^10.2.2",
     "@vaagatech/anvesh-plugins": "0.4.0",
     "@vaagatech/vaakly": "0.4.0",

@@ -74,21 +74,35 @@ export function mapAnveshQueryToElasticsearch(query: AnveshSearchQuery): Record<
         must.push({ prefix: { [field === "*" ? "_all" : field]: query.q } });
       }
     } else {
-      const multiMatch: Record<string, unknown> = {
+      const bestFields: Record<string, unknown> = {
         query: query.q,
         fields,
         type: "best_fields",
       };
       if (query.fuzziness !== undefined && query.fuzziness !== false) {
-        multiMatch.fuzziness = query.fuzziness;
+        bestFields.fuzziness = query.fuzziness;
       }
       if (query.boosts) {
-        multiMatch.fields = fields.map((f) => {
+        bestFields.fields = fields.map((f) => {
           const boost = query.boosts?.[f];
           return boost != null ? `${f}^${boost}` : f;
         });
       }
-      must.push({ multi_match: multiMatch });
+
+      // Add phrase exact match boost to bump relevance of literal keyword phrases
+      const phraseMatch: Record<string, unknown> = {
+        query: query.q,
+        fields: bestFields.fields ?? fields,
+        type: "phrase",
+        boost: 10,
+      };
+
+      must.push({
+        bool: {
+          must: [{ multi_match: bestFields }],
+          should: [{ multi_match: phraseMatch }],
+        },
+      });
     }
   }
 

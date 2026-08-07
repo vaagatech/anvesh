@@ -6,6 +6,11 @@ import { createServer } from "node:http";
 import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { mkdirSync, createWriteStream } from "node:fs";
+import { pipeline } from "node:stream/promises";
+import os from "node:os";
+import { randomUUID } from "node:crypto";
+import Database from "better-sqlite3";
 import pino from "pino";
 import {
   crawledPageToDocument,
@@ -36,6 +41,55 @@ type JobRecord = {
   failed?: number;
 };
 
+const dataDir = process.env.ANVESH_INDEXER_DATA_DIR ?? path.resolve(process.cwd(), ".anvesh");
+const jobsDbPath = path.join(dataDir, "indexer_jobs.sqlite");
+
+class SQLiteJobsMap {
+  private db: import("better-sqlite3").Database;
+  private stmtGet: import("better-sqlite3").Statement;
+  private stmtSet: import("better-sqlite3").Statement;
+  private stmtDel: import("better-sqlite3").Statement;
+  private stmtList: import("better-sqlite3").Statement;
+
+  constructor(file: string) {
+    mkdirSync(path.dirname(file), { recursive: true });
+    this.db = new Database(file);
+    this.db.exec("CREATE TABLE IF NOT EXISTS indexer_jobs (id TEXT PRIMARY KEY, data TEXT)");
+    this.stmtGet = this.db.prepare("SELECT data FROM indexer_jobs WHERE id = ?");
+    this.stmtSet = this.db.prepare("INSERT OR REPLACE INTO indexer_jobs (id, data) VALUES (?, ?)");
+    this.stmtDel = this.db.prepare("DELETE FROM indexer_jobs WHERE id = ?");
+    this.stmtList = this.db.prepare("SELECT id, data FROM indexer_jobs");
+  }
+
+  get(id: string): JobRecord | undefined {
+    const row = this.stmtGet.get(id) as { data: string } | undefined;
+    return row ? JSON.parse(row.data) : undefined;
+  }
+  set(id: string, job: JobRecord) {
+    this.stmtSet.run(id, JSON.stringify(job));
+    return this;
+  }
+  delete(id: string) {
+    this.stmtDel.run(id);
+    return true;
+  }
+  entries(): [string, JobRecord][] {
+    const rows = this.stmtList.all() as { id: string; data: string }[];
+    return rows.map((r) => [r.id, JSON.parse(r.data)]);
+  }
+  values(): JobRecord[] {
+    const rows = this.stmtList.all() as { id: string; data: string }[];
+    return rows.map((r) => JSON.parse(r.data));
+  }
+  get size(): number {
+    const row = this.db.prepare("SELECT COUNT(*) as count FROM indexer_jobs").get() as { count: number };
+    return row.count;
+  }
+  close() {
+    this.db.close();
+  }
+}
+
 function readJson(req: import("node:http").IncomingMessage): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
@@ -51,10 +105,11 @@ function readJson(req: import("node:http").IncomingMessage): Promise<unknown> {
   });
 }
 
-function pushLog(job: JobRecord, line: string) {
+function pushLog(job: JobRecord, line: string, save?: () => void) {
   job.logs.push(line);
   if (job.logs.length > 400) job.logs.splice(0, job.logs.length - 400);
   log.info(line);
+  if (save) save();
 }
 
 async function ensureIndex(
@@ -133,7 +188,7 @@ function toDocuments(body: {
 }
 
 export function startIndexerServer(port = Number(process.env.ANVESH_INDEXER_PORT ?? 3852)): void {
-  const jobs = new Map<string, JobRecord>();
+  const jobs = new SQLiteJobsMap(jobsDbPath);
 
   const server = createServer(async (req, res) => {
     const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
@@ -169,7 +224,8 @@ export function startIndexerServer(port = Number(process.env.ANVESH_INDEXER_PORT
 
     if (req.method === "POST" && url.pathname === "/v1/jobs") {
       try {
-        const body = (await readJson(req)) as {
+        const id = `job_${Date.now()}_${randomUUID().slice(0, 8)}`;
+        let body: {
           index?: string;
           input?: string;
           pages?: CrawledPage[];
@@ -179,6 +235,20 @@ export function startIndexerServer(port = Number(process.env.ANVESH_INDEXER_PORT
           batchSize?: number;
           createIndex?: boolean;
         };
+
+        if (req.headers["content-type"]?.includes("ndjson")) {
+          const tmpPath = path.join(os.tmpdir(), `${id}.ndjson`);
+          await pipeline(req, createWriteStream(tmpPath));
+          body = {
+            input: tmpPath,
+            index: Array.isArray(req.headers["x-anvesh-index"]) ? req.headers["x-anvesh-index"][0] : req.headers["x-anvesh-index"] as string,
+            engineUrl: Array.isArray(req.headers["x-anvesh-engine-url"]) ? req.headers["x-anvesh-engine-url"][0] : req.headers["x-anvesh-engine-url"] as string,
+            apiKey: Array.isArray(req.headers["x-anvesh-engine-key"]) ? req.headers["x-anvesh-engine-key"][0] : req.headers["x-anvesh-engine-key"] as string,
+          };
+        } else {
+          body = (await readJson(req)) as typeof body;
+        }
+
         if (!body.index) {
           res.writeHead(400, { "content-type": "application/json" });
           res.end(JSON.stringify({ ok: false, message: "index is required." }));
@@ -192,13 +262,12 @@ export function startIndexerServer(port = Number(process.env.ANVESH_INDEXER_PORT
           res.end(
             JSON.stringify({
               ok: false,
-              message: "Provide pages[], documents[], or input (file path).",
+              message: "Provide pages[], documents[], or input (file path) or ndjson stream.",
             }),
           );
           return;
         }
 
-        const id = `job_${Date.now()}`;
         const job: JobRecord = {
           status: "running",
           message: "Indexing started.",
@@ -214,6 +283,7 @@ export function startIndexerServer(port = Number(process.env.ANVESH_INDEXER_PORT
           }),
         );
 
+        const saveJob = () => jobs.set(id, job);
         void (async () => {
           try {
             if (docs.length) {
@@ -221,7 +291,7 @@ export function startIndexerServer(port = Number(process.env.ANVESH_INDEXER_PORT
                 throw new Error("engineUrl is required when indexing pages/documents over HTTP.");
               }
               const engineUrl = body.engineUrl.replace(/\/$/, "");
-              pushLog(job, `Indexing ${docs.length} document(s) into "${body.index}" via ${engineUrl}`);
+              pushLog(job, `Indexing ${docs.length} document(s) into "${body.index}" via ${engineUrl}`, saveJob);
               if (body.createIndex !== false) {
                 await ensureIndex(engineUrl, body.index!, body.apiKey, job);
               }
@@ -237,12 +307,12 @@ export function startIndexerServer(port = Number(process.env.ANVESH_INDEXER_PORT
               job.failed = result.failed;
               job.status = result.failed && !result.indexed ? "failed" : "completed";
               job.message = `Indexed ${result.indexed} document(s) into "${body.index}" (${result.failed} failed).`;
-              pushLog(job, job.message);
+              pushLog(job, job.message, saveJob);
               return;
             }
 
             // Legacy file path via CLI
-            pushLog(job, `Indexing from file ${body.input} into "${body.index}"`);
+            pushLog(job, `Indexing from file ${body.input} into "${body.index}"`, saveJob);
             const cli = path.resolve(__dirname, "cli.js");
             const args = ["--index", body.index!, "--input", body.input!];
             if (body.engineUrl) args.push("--engine-url", body.engineUrl);
@@ -254,10 +324,10 @@ export function startIndexerServer(port = Number(process.env.ANVESH_INDEXER_PORT
               stdio: ["ignore", "pipe", "pipe"],
             });
             let errBuf = "";
-            child.stdout?.on("data", (d) => pushLog(job, String(d).trim()));
+            child.stdout?.on("data", (d) => pushLog(job, String(d).trim(), saveJob));
             child.stderr.on("data", (d) => {
               errBuf += String(d);
-              pushLog(job, String(d).trim());
+              pushLog(job, String(d).trim(), saveJob);
             });
             child.on("exit", (code) => {
               if (code === 0) {
@@ -267,12 +337,12 @@ export function startIndexerServer(port = Number(process.env.ANVESH_INDEXER_PORT
                 job.status = "failed";
                 job.message = errBuf.trim() || `Indexer exited with code ${code}`;
               }
-              pushLog(job, job.message);
+              pushLog(job, job.message, saveJob);
             });
           } catch (err) {
             job.status = "failed";
             job.message = err instanceof Error ? err.message : String(err);
-            pushLog(job, `FAILED: ${job.message}`);
+            pushLog(job, `FAILED: ${job.message}`, saveJob);
           }
         })();
       } catch (err) {
@@ -293,5 +363,24 @@ export function startIndexerServer(port = Number(process.env.ANVESH_INDEXER_PORT
 
   server.listen(port, "0.0.0.0", () => {
     log.info({ port }, `Anvesh Indexer worker listening on :${port}`);
+  });
+
+  const gracefulShutdown = async () => {
+    log.info("Shutting down Indexer server gracefully...");
+    jobs.close();
+    server.close(() => {
+      process.exit(0);
+    });
+  };
+  process.on("SIGINT", gracefulShutdown);
+  process.on("SIGTERM", gracefulShutdown);
+
+  process.on("uncaughtException", (err) => {
+    log.error({ err }, "Indexer uncaughtException");
+    process.exit(1);
+  });
+  process.on("unhandledRejection", (err) => {
+    log.error({ err }, "Indexer unhandledRejection");
+    process.exit(1);
   });
 }

@@ -8,10 +8,10 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build -w @vaagatech/anvesh-shared && npm run build -w @vaagatech/anvesh-plugins && npm run build -w @vaagatech/vaakly && npm run build -w @vaagatech/anvesh-search-adapters && npm run build -w @vaagatech/anvesh-engine && npm run build -w @vaagatech/anvesh-indexer && npm run build -w @vaagatech/anvesh-spider && npm run build -w @vaagatech/anvesh-hub && npm run build -w @vaagatech/anvesh-setup",
-    "test": "npm run build -w @vaagatech/anvesh-plugins && npm run build -w @vaagatech/vaakly && npm run test -w @vaagatech/anvesh-plugins && npm run test -w @vaagatech/vaakly && npm run test -w @vaagatech/anvesh-search-adapters && npm run test -w @vaagatech/anvesh-engine && npm run test -w @vaagatech/anvesh-spider && npm run test -w @vaagatech/anvesh-hub",
+    "build": "turbo run build",
+    "test": "turbo run test",
     "test:e2e": "npm run build && vitest run --config e2e/vitest.config.ts",
-    "lint": "npm run lint --workspaces --if-present",
+    "lint": "turbo run lint",
     "dev:engine": "npm run dev -w @vaagatech/anvesh-engine",
     "dev:hub": "npm run start -w @vaagatech/anvesh-hub",
     "dev:hub-ui": "npm run dev:ui -w @vaagatech/anvesh-hub",
@@ -39,5 +39,12 @@
   "homepage": "https://www.vaagatech.com",
   "engines": {
     "node": ">=20"
+  },
+  "packageManager": "npm@10.8.2",
+  "allowScripts": {
+    "better-sqlite3@13.0.3": true
+  },
+  "devDependencies": {
+    "turbo": "^2.10.8"
   }
 }

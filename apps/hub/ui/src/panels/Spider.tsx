@@ -103,9 +103,10 @@ export function SpiderPanel({
 
   const [indexes, setIndexes] = useState<IndexInfo[]>([]);
   const [name, setName] = useState("");
-  const [seeds, setSeeds] = useState("https://www.vaagatech.com/");
-  const [maxPages, setMaxPages] = useState(50);
-  const [maxDepth, setMaxDepth] = useState(3);
+  const [seeds, setSeeds] = useState("https://www.uipath.com/");
+  const [maxPages, setMaxPages] = useState(2000);
+  const [maxDepth, setMaxDepth] = useState(8);
+  const [concurrency, setConcurrency] = useState(5);
   const [instanceId, setInstanceId] = useState("");
   const [indexName, setIndexName] = useState("articles");
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -119,6 +120,7 @@ export function SpiderPanel({
   const [editSeeds, setEditSeeds] = useState("");
   const [editMaxPages, setEditMaxPages] = useState(50);
   const [editMaxDepth, setEditMaxDepth] = useState(3);
+  const [editConcurrency, setEditConcurrency] = useState(5);
   const [editJson, setEditJson] = useState("");
   const [editAdvanced, setEditAdvanced] = useState(false);
 
@@ -155,6 +157,7 @@ export function SpiderPanel({
       seeds: seedList,
       maxPages,
       maxDepth,
+      concurrency,
       roles: [{ name: "guest", anonymous: true }],
     };
   }
@@ -167,8 +170,9 @@ export function SpiderPanel({
     const cfg = c.config ?? {};
     const seedVal = Array.isArray(cfg.seeds) ? (cfg.seeds as string[]).join("\n") : "";
     setEditSeeds(seedVal);
-    setEditMaxPages(typeof cfg.maxPages === "number" ? cfg.maxPages : 50);
-    setEditMaxDepth(typeof cfg.maxDepth === "number" ? cfg.maxDepth : 3);
+    setEditMaxPages(typeof cfg.maxPages === "number" ? cfg.maxPages : 2000);
+    setEditMaxDepth(typeof cfg.maxDepth === "number" ? cfg.maxDepth : 8);
+    setEditConcurrency(typeof cfg.concurrency === "number" ? cfg.concurrency : 5);
     const { indexName: _i, outputPath: _o, autoIndex: _a, ...rest } = cfg;
     setEditJson(JSON.stringify(rest, null, 2));
     setEditAdvanced(false);
@@ -228,68 +232,78 @@ export function SpiderPanel({
           </div>
         )}
 
-        <div className="grid-2">
-          <div className="field">
-            <label>Config name</label>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. vaagatech-site"
+        <div className="form-stack">
+          <div className="grid-2">
+            <div className="field">
+              <label>Config name</label>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. vaagatech-site"
+              />
+              {nameTaken(name) && (
+                <p className="help" style={{ color: "var(--danger, #f87171)" }}>
+                  That name is already used.
+                </p>
+              )}
+            </div>
+            <div className="field">
+              <label>Spider worker</label>
+              <select value={instanceId} onChange={(e) => setInstanceId(e.target.value)}>
+                <option value="">Select…</option>
+                {enabledSpiders.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label>Engine</label>
+              <select
+                value={engineId}
+                onChange={(e) => {
+                  setEngineId(e.target.value);
+                }}
+              >
+                <option value="">Select…</option>
+                {enabledEngines.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <IndexField
+              id="crawl-index"
+              indexes={indexes}
+              value={indexName}
+              onChange={setIndexName}
+              disabled={!engineId}
+              help="Select an existing index or type a new name — created on Run with vectorDimensions 256 and autoEmbed."
             />
-            {nameTaken(name) && (
-              <p className="help" style={{ color: "var(--danger, #b33)" }}>
-                That name is already used.
-              </p>
-            )}
           </div>
-          <div className="field">
-            <label>Spider worker</label>
-            <select value={instanceId} onChange={(e) => setInstanceId(e.target.value)}>
-              <option value="">Select…</option>
-              {enabledSpiders.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label>Engine</label>
-            <select
-              value={engineId}
-              onChange={(e) => {
-                setEngineId(e.target.value);
-              }}
-            >
-              <option value="">Select…</option>
-              {enabledEngines.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <IndexField
-            id="crawl-index"
-            indexes={indexes}
-            value={indexName}
-            onChange={setIndexName}
-            disabled={!engineId}
-            help="Select an existing index or type a new name — created on Run with vectorDimensions 256 and autoEmbed."
-          />
+
           <div className="field">
             <label>Seed URLs (one per line)</label>
             <textarea value={seeds} onChange={(e) => setSeeds(e.target.value)} rows={3} />
           </div>
-          <div className="grid-2" style={{ margin: 0 }}>
+
+          <div className="grid-3">
             <div className="field">
-              <label>Max pages</label>
+              <label>Max pages (0 for unlimited)</label>
               <input
                 type="number"
-                min={1}
+                min={0}
                 value={maxPages}
                 onChange={(e) => setMaxPages(Number(e.target.value))}
               />
+              <div style={{ display: "flex", gap: "0.35rem", marginTop: "0.4rem" }}>
+                <button type="button" className="btn secondary" style={{ padding: "0.15rem 0.45rem", fontSize: "0.75rem" }} onClick={() => setMaxPages(50)}>50</button>
+                <button type="button" className="btn secondary" style={{ padding: "0.15rem 0.45rem", fontSize: "0.75rem" }} onClick={() => setMaxPages(500)}>500</button>
+                <button type="button" className="btn secondary" style={{ padding: "0.15rem 0.45rem", fontSize: "0.75rem" }} onClick={() => setMaxPages(2000)}>2k (Sitemap)</button>
+                <button type="button" className="btn secondary" style={{ padding: "0.15rem 0.45rem", fontSize: "0.75rem" }} onClick={() => setMaxPages(0)}>Unlimited (0)</button>
+              </div>
             </div>
             <div className="field">
               <label>Max depth</label>
@@ -298,6 +312,16 @@ export function SpiderPanel({
                 min={0}
                 value={maxDepth}
                 onChange={(e) => setMaxDepth(Number(e.target.value))}
+              />
+            </div>
+            <div className="field">
+              <label>Concurrency (parallel runs)</label>
+              <input
+                type="number"
+                min={1}
+                max={50}
+                value={concurrency}
+                onChange={(e) => setConcurrency(Number(e.target.value))}
               />
             </div>
           </div>
@@ -445,68 +469,83 @@ export function SpiderPanel({
 
       {edit && (
         <Drawer title={`Edit ${edit.name}`} onClose={() => setEdit(null)}>
-          <div className="field">
-            <label>Config name</label>
-            <input value={editName} onChange={(e) => setEditName(e.target.value)} />
-            {nameTaken(editName, edit.id) && (
-              <p className="help" style={{ color: "var(--danger, #b33)" }}>
-                That name is already used.
-              </p>
+          <div className="form-stack">
+            <div className="grid-2">
+              <div className="field">
+                <label>Config name</label>
+                <input value={editName} onChange={(e) => setEditName(e.target.value)} />
+                {nameTaken(editName, edit.id) && (
+                  <p className="help" style={{ color: "var(--danger, #f87171)" }}>
+                    That name is already used.
+                  </p>
+                )}
+              </div>
+              <div className="field">
+                <label>Spider worker</label>
+                <select value={editInstanceId} onChange={(e) => setEditInstanceId(e.target.value)}>
+                  <option value="">Select…</option>
+                  {enabledSpiders.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <IndexField
+                id="edit-crawl-index"
+                indexes={indexes}
+                value={editIndexName}
+                onChange={setEditIndexName}
+                help="Optional when saving — required at Run time."
+              />
+            </div>
+
+            {!editAdvanced ? (
+              <>
+                <div className="field">
+                  <label>Seed URLs</label>
+                  <textarea
+                    value={editSeeds}
+                    onChange={(e) => setEditSeeds(e.target.value)}
+                    rows={3}
+                  />
+                </div>
+                <div className="grid-3">
+                  <div className="field">
+                    <label>Max pages</label>
+                    <input
+                      type="number"
+                      value={editMaxPages}
+                      onChange={(e) => setEditMaxPages(Number(e.target.value))}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Max depth</label>
+                    <input
+                      type="number"
+                      value={editMaxDepth}
+                      onChange={(e) => setEditMaxDepth(Number(e.target.value))}
+                    />
+                  </div>
+                  <div className="field">
+                    <label>Concurrency (parallel runs)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={50}
+                      value={editConcurrency}
+                      onChange={(e) => setEditConcurrency(Number(e.target.value))}
+                    />
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="field">
+                <label>Crawl JSON</label>
+                <textarea value={editJson} onChange={(e) => setEditJson(e.target.value)} rows={10} />
+              </div>
             )}
           </div>
-          <div className="field">
-            <label>Spider worker</label>
-            <select value={editInstanceId} onChange={(e) => setEditInstanceId(e.target.value)}>
-              <option value="">Select…</option>
-              {enabledSpiders.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <IndexField
-            id="edit-crawl-index"
-            indexes={indexes}
-            value={editIndexName}
-            onChange={setEditIndexName}
-            help="Optional when saving — required at Run time."
-          />
-          {!editAdvanced ? (
-            <>
-              <div className="field">
-                <label>Seed URLs</label>
-                <textarea
-                  value={editSeeds}
-                  onChange={(e) => setEditSeeds(e.target.value)}
-                  rows={3}
-                />
-              </div>
-              <div className="grid-2">
-                <div className="field">
-                  <label>Max pages</label>
-                  <input
-                    type="number"
-                    value={editMaxPages}
-                    onChange={(e) => setEditMaxPages(Number(e.target.value))}
-                  />
-                </div>
-                <div className="field">
-                  <label>Max depth</label>
-                  <input
-                    type="number"
-                    value={editMaxDepth}
-                    onChange={(e) => setEditMaxDepth(Number(e.target.value))}
-                  />
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="field">
-              <label>Crawl JSON</label>
-              <textarea value={editJson} onChange={(e) => setEditJson(e.target.value)} rows={10} />
-            </div>
-          )}
           <button
             type="button"
             className="btn ghost"
@@ -541,6 +580,7 @@ export function SpiderPanel({
                         .filter(Boolean),
                       maxPages: editMaxPages,
                       maxDepth: editMaxDepth,
+                      concurrency: editConcurrency,
                       roles: [{ name: "guest", anonymous: true }],
                     };
                   }

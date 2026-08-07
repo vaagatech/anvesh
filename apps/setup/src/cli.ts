@@ -403,13 +403,20 @@ async function freePort(port: string): Promise<void> {
     const { execFile } = await import("node:child_process");
     const { promisify } = await import("node:util");
     const execFileAsync = promisify(execFile);
-    const { stdout } = await execFileAsync("lsof", ["-ti", `tcp:${port}`], {
-      encoding: "utf8",
-    }).catch(() => ({ stdout: "" }));
-    const pids = stdout
-      .split("\n")
-      .map((s) => s.trim())
-      .filter(Boolean);
+
+    const getPids = async () => {
+      const { stdout } = await execFileAsync("lsof", ["-ti", `tcp:${port}`], {
+        encoding: "utf8",
+      }).catch(() => ({ stdout: "" }));
+      return stdout
+        .split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean);
+    };
+
+    let pids = await getPids();
+    if (!pids.length) return;
+
     for (const pid of pids) {
       try {
         process.kill(Number(pid), "SIGTERM");
@@ -418,13 +425,21 @@ async function freePort(port: string): Promise<void> {
         /* ok */
       }
     }
-    if (pids.length) await new Promise((r) => setTimeout(r, 300));
+
+    await new Promise((r) => setTimeout(r, 300));
+    pids = await getPids();
     for (const pid of pids) {
       try {
         process.kill(Number(pid), "SIGKILL");
       } catch {
         /* ok */
       }
+    }
+
+    for (let i = 0; i < 15; i++) {
+      pids = await getPids();
+      if (!pids.length) break;
+      await new Promise((r) => setTimeout(r, 100));
     }
   } catch {
     /* lsof missing — ignore */

@@ -393,7 +393,17 @@ export class VectorStore {
     // Flat brute-force or SQ8 quantized scan
     const scored: Array<{ id: DocumentId; score: number }> = [];
 
-    if (this.quantization === "sq8" && this.quantizedVectors.size === this.vectors.size) {
+    if (candidates && candidates.size < this.vectors.size / 2) {
+      for (const id of candidates) {
+        const qVec = this.quantizedVectors.get(id);
+        const vec = this.vectors.get(id);
+        if (!vec && !qVec) continue;
+        const score = qVec
+          ? computeVectorSimilarity(q, dequantizeVector(qVec), metric)
+          : computeVectorSimilarity(q, vec!, metric);
+        if (score >= minScore) scored.push({ id, score });
+      }
+    } else if (this.quantization === "sq8" && this.quantizedVectors.size === this.vectors.size) {
       for (const [id, qVec] of this.quantizedVectors) {
         if (candidates && !candidates.has(id)) continue;
         const dequantized = dequantizeVector(qVec);

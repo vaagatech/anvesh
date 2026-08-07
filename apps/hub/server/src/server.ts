@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import fastifyStatic from "@fastify/static";
+import helmet from "@fastify/helmet";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
@@ -279,6 +280,10 @@ export async function createHubServer(options?: {
   }
 
   const app = Fastify({ logger: false, trustProxy: true });
+  await app.register(helmet, {
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+  });
   await app.register(cors, { origin: true });
 
   const staleMinutes = Math.max(
@@ -1678,6 +1683,21 @@ export async function createHubServer(options?: {
         },
       );
       const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      if (!res.ok || json.ok === false) {
+        if (job.status === "completed" || job.status === "failed") {
+          return { ok: true, job };
+        }
+        await store.update((st) => {
+          const j = st.jobs.find((x) => x.id === id);
+          if (!j) return;
+          j.status = "failed";
+          j.message = (json.message as string | undefined) || "Worker process restarted during job.";
+          j.updatedAt = new Date().toISOString();
+          refreshed = j;
+        });
+        return { ok: true, job: refreshed };
+      }
+
       const remoteStatus = (json.status ?? json.state) as string | undefined;
       const statusMap: Record<string, "queued" | "running" | "completed" | "failed" | "unknown"> =
         {
@@ -1745,6 +1765,13 @@ export async function createHubServer(options?: {
       if (req.url.startsWith("/hub/")) {
         return reply.status(404).send({ ok: false, message: "Hub API route not found." });
       }
+      const pathname = req.url.split("?")[0];
+      if (
+        pathname.startsWith("/assets/") ||
+        /\.(js|css|json|png|jpg|jpeg|gif|svg|ico|woff2?|ttf|map)$/i.test(pathname)
+      ) {
+        return reply.status(404).send({ ok: false, message: "Asset not found." });
+      }
       return reply.sendFile("index.html");
     });
   } catch {
@@ -1767,8 +1794,33 @@ export async function listenHub(options?: {
   const { app } = await createHubServer(options);
   const port = options?.port ?? Number(process.env.ANVESH_HUB_PORT ?? 3849);
   const host = options?.host ?? process.env.ANVESH_HUB_HOST ?? "0.0.0.0";
-  await app.listen({ port, host });
+  await app.listen({
+    port,
+    host,
+    listenTextResolver: (address) => `http://${host}:${port}`,
+  });
   // eslint-disable-next-line no-console
   console.log(`Anvesh Hub listening on http://${host}:${port} — by VaagaTech`);
+
+  const gracefulShutdown = async () => {
+    // eslint-disable-next-line no-console
+    console.log("Shutting down Hub server gracefully...");
+    await app.close();
+    process.exit(0);
+  };
+  process.on("SIGINT", gracefulShutdown);
+  process.on("SIGTERM", gracefulShutdown);
+
+  process.on("uncaughtException", (err) => {
+    // eslint-disable-next-line no-console
+    console.error("Hub uncaughtException:", err);
+    process.exit(1);
+  });
+  process.on("unhandledRejection", (err) => {
+    // eslint-disable-next-line no-console
+    console.error("Hub unhandledRejection:", err);
+    process.exit(1);
+  });
+
   return app;
 }

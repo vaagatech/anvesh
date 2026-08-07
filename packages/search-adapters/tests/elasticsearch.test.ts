@@ -21,11 +21,27 @@ describe("Elasticsearch mapper", () => {
         bool: {
           must: [
             {
-              multi_match: {
-                query: "lightweight search",
-                fields: ["title", "body"],
-                type: "best_fields",
-                fuzziness: "AUTO",
+              bool: {
+                must: [
+                  {
+                    multi_match: {
+                      query: "lightweight search",
+                      fields: ["title", "body"],
+                      type: "best_fields",
+                      fuzziness: "AUTO",
+                    },
+                  },
+                ],
+                should: [
+                  {
+                    multi_match: {
+                      query: "lightweight search",
+                      fields: ["title", "body"],
+                      type: "phrase",
+                      boost: 10,
+                    },
+                  },
+                ],
               },
             },
           ],

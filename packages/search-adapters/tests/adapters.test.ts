@@ -43,7 +43,7 @@ describe("createSearchBackend", () => {
       const u = String(url);
       if (u.includes("/_search")) {
         const body = JSON.parse(String(init?.body));
-        expect(body.query.bool.must[0].multi_match.query).toBe("hello");
+        expect(body.query.bool.must[0].bool.must[0].multi_match.query).toBe("hello");
         return new Response(
           JSON.stringify({
             took: 4,

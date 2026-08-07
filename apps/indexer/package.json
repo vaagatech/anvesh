@@ -28,13 +28,16 @@
     "README.md"
   ],
   "dependencies": {
+    "@fastify/helmet": "^13.1.0",
     "@vaagatech/anvesh-engine": "0.4.0",
     "@vaagatech/anvesh-shared": "0.4.0",
+    "better-sqlite3": "^13.0.3",
     "pino": "^9.6.0",
     "pino-pretty": "^13.0.0",
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^22.13.10",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2"

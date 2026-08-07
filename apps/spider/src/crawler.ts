@@ -3,6 +3,7 @@
  * Discovers pages visible only after login for each configured role.
  */
 import type { CrawledPage, CrawlRole, SpiderConfig } from "@vaagatech/anvesh-shared";
+import v8 from "node:v8";
 import { RoleSession } from "./session.js";
 import { parseSitemapUrls, RobotsRules } from "./robots.js";
 import { extractPage } from "./extract.js";
@@ -57,13 +58,19 @@ function pathAllowed(url: string, cfg: SpiderConfig): boolean {
   return true;
 }
 
+const DEFAULT_CHUNK_SIZE = Number(process.env.ANVESH_SPIDER_CHUNK_SIZE ?? 50);
+const DEFAULT_HEAP_WATCH_PERCENT = Number(process.env.ANVESH_SPIDER_HEAP_WATCH_PERCENT ?? 25);
+
 export class SiteSpider {
   constructor(
     private readonly config: SpiderConfig,
     private readonly log: Logger,
   ) {}
 
-  async crawl(): Promise<CrawledPage[]> {
+  async crawl(
+    onChunk?: (chunk: CrawledPage[]) => Promise<void>,
+    chunkSize = DEFAULT_CHUNK_SIZE,
+  ): Promise<CrawledPage[]> {
     const seeds = this.config.seeds
       .map((s) => normalizeUrl(s))
       .filter((s): s is string => Boolean(s));
@@ -80,7 +87,17 @@ export class SiteSpider {
         // try https then http based on seeds
         const seed = seeds.find((s) => new URL(s).host === host);
         const o = seed ? new URL(seed).origin : origin;
-        robotsByOrigin.set(host, await RobotsRules.fetch(o, this.config.userAgent, this.config.requestTimeoutMs));
+        try {
+          robotsByOrigin.set(
+            host,
+            await RobotsRules.fetch(o, this.config.userAgent, this.config.requestTimeoutMs),
+          );
+        } catch (e) {
+          this.log.warn(
+            { host, err: e instanceof Error ? e.message : String(e) },
+            "Failed to fetch robots.txt — continuing without rules.",
+          );
+        }
       }
     }
 
@@ -88,26 +105,39 @@ export class SiteSpider {
     if (this.config.followSitemaps) {
       for (const [, robots] of robotsByOrigin) {
         for (const sm of robots.getSitemaps()) {
+          try {
+            const urls = await parseSitemapUrls(
+              sm,
+              this.config.userAgent,
+              this.config.requestTimeoutMs,
+            );
+            seedExtras.push(...urls);
+            this.log.info({ sitemap: sm, urls: urls.length }, "Loaded sitemap URLs.");
+          } catch (e) {
+            this.log.warn(
+              { sitemap: sm, err: e instanceof Error ? e.message : String(e) },
+              "Failed to fetch sitemap — continuing.",
+            );
+          }
+        }
+      }
+      for (const seed of seeds) {
+        try {
+          const sm = `${new URL(seed).origin}/sitemap.xml`;
           const urls = await parseSitemapUrls(
             sm,
             this.config.userAgent,
             this.config.requestTimeoutMs,
           );
-          seedExtras.push(...urls);
-          this.log.info({ sitemap: sm, urls: urls.length }, "Loaded sitemap URLs.");
-        }
-        // common default
-      }
-      for (const seed of seeds) {
-        const sm = `${new URL(seed).origin}/sitemap.xml`;
-        const urls = await parseSitemapUrls(
-          sm,
-          this.config.userAgent,
-          this.config.requestTimeoutMs,
-        );
-        if (urls.length) {
-          seedExtras.push(...urls);
-          this.log.info({ sitemap: sm, urls: urls.length }, "Loaded default sitemap.");
+          if (urls.length) {
+            seedExtras.push(...urls);
+            this.log.info({ sitemap: sm, urls: urls.length }, "Loaded default sitemap.");
+          }
+        } catch (e) {
+          this.log.debug(
+            { seed, err: e instanceof Error ? e.message : String(e) },
+            "No default sitemap found.",
+          );
         }
       }
     }
@@ -117,31 +147,40 @@ export class SiteSpider {
 
     for (const role of this.config.roles) {
       this.log.info({ role: role.name }, `Starting crawl pass for role "${role.name}".`);
-      const pages = await this.crawlAsRole(
-        role,
-        [...seeds, ...seedExtras],
-        allowedHosts,
-        robotsByOrigin,
-      );
-      for (const page of pages) {
-        const key = page.finalUrl;
-        const existing = byUrl.get(key);
-        if (existing) {
-          if (!existing.roles.includes(role.name)) existing.roles.push(role.name);
-          // Prefer richer text if we got more content under this role
-          if (page.text.length > existing.text.length) {
-            existing.text = page.text;
-            existing.title = page.title || existing.title;
-            existing.description = page.description ?? existing.description;
+      try {
+        const pages = await this.crawlAsRole(
+          role,
+          [...seeds, ...seedExtras],
+          allowedHosts,
+          robotsByOrigin,
+          onChunk,
+          chunkSize,
+        );
+        for (const page of pages) {
+          const key = page.finalUrl;
+          const existing = byUrl.get(key);
+          if (existing) {
+            if (!existing.roles.includes(role.name)) existing.roles.push(role.name);
+            // Prefer richer text if we got more content under this role
+            if (page.text.length > existing.text.length) {
+              existing.text = page.text;
+              existing.title = page.title || existing.title;
+              existing.description = page.description ?? existing.description;
+            }
+          } else {
+            byUrl.set(key, page);
           }
-        } else {
-          byUrl.set(key, page);
         }
+        this.log.info(
+          { role: role.name, pages: pages.length },
+          `Finished crawl pass for role "${role.name}" — discovered ${pages.length} page(s).`,
+        );
+      } catch (err) {
+        this.log.warn(
+          { role: role.name, err: err instanceof Error ? err.message : String(err) },
+          `Crawl pass for role "${role.name}" encountered an error — continuing.`,
+        );
       }
-      this.log.info(
-        { role: role.name, pages: pages.length },
-        `Finished crawl pass for role "${role.name}" — discovered ${pages.length} page(s).`,
-      );
     }
 
     return [...byUrl.values()];
@@ -152,16 +191,44 @@ export class SiteSpider {
     seeds: string[],
     allowedHosts: Set<string>,
     robotsByOrigin: Map<string, RobotsRules>,
+    onChunk?: (chunk: CrawledPage[]) => Promise<void>,
+    chunkSize = 50,
   ): Promise<CrawledPage[]> {
     const session = new RoleSession(role, this.config.userAgent, this.config.requestTimeoutMs);
     if (!role.anonymous && role.login) {
       this.log.info({ role: role.name, loginUrl: role.login.url }, "Performing role login.");
-      await session.login(role);
+      try {
+        await session.login(role);
+      } catch (e) {
+        this.log.warn(
+          { role: role.name, err: e instanceof Error ? e.message : String(e) },
+          "Role login failed — continuing crawl unauthenticated.",
+        );
+      }
     }
 
     const queue: QueueItem[] = [];
     const seen = new Set<string>();
     const results: CrawledPage[] = [];
+    const pendingChunk: CrawledPage[] = [];
+
+    const flushChunk = async (force = false) => {
+      const heapStats = v8.getHeapStatistics();
+      const heapLimit = heapStats.heap_size_limit;
+      const heapUsed = process.memoryUsage().heapUsed;
+      const heapMb = Math.round(heapUsed / 1024 / 1024);
+      const heapPercent = (heapUsed / heapLimit) * 100;
+      const heapHigh = heapPercent >= DEFAULT_HEAP_WATCH_PERCENT;
+
+      if (onChunk && (pendingChunk.length >= chunkSize || (pendingChunk.length > 0 && (force || heapHigh)))) {
+        const batch = pendingChunk.splice(0, pendingChunk.length);
+        this.log.info(
+          { count: batch.length, heapUsedMb: heapMb, heapPercent: Math.round(heapPercent) },
+          `Flushing chunk of ${batch.length} page(s) to pipeline (heap: ${heapMb}MB / ${Math.round(heapPercent)}% of heap limit, trigger: ${DEFAULT_HEAP_WATCH_PERCENT}%).`,
+        );
+        await onChunk(batch);
+      }
+    };
 
     const enqueue = (raw: string, depth: number) => {
       const url = normalizeUrl(raw);
@@ -181,29 +248,35 @@ export class SiteSpider {
     const workers = Math.max(1, this.config.concurrency);
     let active = 0;
 
+    const limit = this.config.maxPages > 0 ? this.config.maxPages : Infinity;
+
     await new Promise<void>((resolve) => {
       const pump = () => {
-        if (results.length >= this.config.maxPages && queue.length === 0 && active === 0) {
+        if (active === 0 && (results.length >= limit || queue.length === 0)) {
           resolve();
           return;
         }
-        if (queue.length === 0 && active === 0) {
-          resolve();
-          return;
-        }
-        while (active < workers && queue.length > 0 && results.length < this.config.maxPages) {
+        while (active < workers && queue.length > 0 && results.length < limit) {
           const item = queue.shift()!;
           active += 1;
           void this.fetchOne(session, role, item)
-            .then((page) => {
+            .then(async (page) => {
               if (page) {
-                results.push(page);
+                if (!onChunk) results.push(page);
+                pendingChunk.push(page);
                 if (page.status >= 200 && page.status < 400) {
                   for (const link of page.links) {
                     enqueue(link, item.depth + 1);
                   }
                 }
+                await flushChunk();
               }
+            })
+            .catch((err) => {
+              this.log.warn(
+                { url: item.url, role: role.name, err: err instanceof Error ? err.stack || err.message : String(err) },
+                "Uncaught fetchOne error — continuing queue processing.",
+              );
             })
             .finally(async () => {
               active -= 1;
@@ -216,6 +289,8 @@ export class SiteSpider {
       };
       pump();
     });
+
+    await flushChunk(true);
 
     return results;
   }
@@ -270,8 +345,12 @@ export class SiteSpider {
         hasArticle: extracted.hasArticle,
       };
     } catch (err) {
+      const cause = err instanceof Error && "cause" in err ? (err as Error & { cause?: unknown }).cause : undefined;
+      const causeMsg = cause instanceof Error ? cause.message : cause ? String(cause) : null;
+      const errMsg = err instanceof Error ? err.message : String(err);
+      const errDetail = causeMsg ? `${errMsg} (${causeMsg})` : errMsg;
       this.log.warn(
-        { url: item.url, role: role.name, err: err instanceof Error ? err.message : String(err) },
+        { url: item.url, role: role.name, err: errDetail },
         "Fetch failed for URL.",
       );
       return null;
