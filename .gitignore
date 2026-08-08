@@ -17,3 +17,4 @@ e2e/.tmp/
 tmp/
 reports/
 *.iml
+/.turbo/

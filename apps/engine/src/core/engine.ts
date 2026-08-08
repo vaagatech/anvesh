@@ -123,6 +123,11 @@ export class AnveshEngine {
     return { ...state.definition, docCount: state.inverted.docCount };
   }
 
+  hasIndex(name: string): boolean {
+    const resolved = this.aliases.get(name) ?? name;
+    return this.indexes.has(resolved);
+  }
+
   async createIndex(
     name: string,
     mappings: Record<string, FieldMapping> = {},
@@ -295,6 +300,19 @@ export class AnveshEngine {
     return state.vectors;
   }
 
+  private async ensureIndexState(indexName: string): Promise<IndexState> {
+    try {
+      return this.require(indexName);
+    } catch {
+      await this.createIndex(
+        indexName,
+        {},
+        { dynamicMapping: true, vectorDimensions: 256 },
+      );
+      return this.require(indexName);
+    }
+  }
+
   async indexDocument(
     indexName: string,
     input: {
@@ -304,7 +322,7 @@ export class AnveshEngine {
       meta?: Record<string, JsonValue>;
     },
   ): Promise<AnveshDocument> {
-    const state = this.require(indexName);
+    const state = await this.ensureIndexState(indexName);
     const id = input.id ?? randomUUID();
     const fields = this.prepareFields(state, input.fields);
     let vector = input.vector;
@@ -331,7 +349,7 @@ export class AnveshEngine {
   }
 
   async bulkIndex(indexName: string, items: BulkIndexItem[]): Promise<BulkIndexResult> {
-    const state = this.require(indexName);
+    const state = await this.ensureIndexState(indexName);
     let indexed = 0;
     const errors: BulkIndexResult["errors"] = [];
     const auto = this.shouldAutoEmbed(state.definition.settings);

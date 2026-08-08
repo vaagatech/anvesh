@@ -305,8 +305,8 @@ export async function createAnveshApp(options: AnveshServerOptions = {}): Promis
       const body = bulkIndexSchema.parse(req.body);
       globalCircuits.checkBulkSize(body.documents.length);
       globalCircuits.checkMemory();
-      const index = engine.getIndex(name);
-      globalCircuits.checkDocCap(index.docCount, body.documents.length);
+      const docCount = engine.hasIndex(name) ? engine.getIndex(name).docCount : 0;
+      globalCircuits.checkDocCap(docCount, body.documents.length);
       const result = await engine.bulkIndex(
         name,
         body.documents.map((d) => ({

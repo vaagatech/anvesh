@@ -144,6 +144,23 @@ async function loadDocuments(inputPath: string): Promise<IndexDocumentPayload[]>
   return docs;
 }
 
+async function ensureIndex(
+  engineUrl: string,
+  apiKey: string | undefined,
+  index: string,
+): Promise<void> {
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  if (apiKey) headers.authorization = `Bearer ${apiKey}`;
+  const base = engineUrl.replace(/\/$/, "");
+  const get = await fetch(`${base}/v1/indexes/${encodeURIComponent(index)}`, { headers });
+  if (get.ok) return;
+  await fetch(`${base}/v1/indexes`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ name: index, mappings: WEB_MAPPINGS, settings: WEB_SETTINGS }),
+  });
+}
+
 async function indexViaHttp(
   engineUrl: string,
   apiKey: string | undefined,
@@ -153,6 +170,8 @@ async function indexViaHttp(
 ): Promise<void> {
   const headers: Record<string, string> = { "content-type": "application/json" };
   if (apiKey) headers.authorization = `Bearer ${apiKey}`;
+
+  await ensureIndex(engineUrl, apiKey, index).catch(() => {/* fallback to engine auto-creation */});
 
   for (let i = 0; i < docs.length; i += batchSize) {
     const chunk = docs.slice(i, i + batchSize);

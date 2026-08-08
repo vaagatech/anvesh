@@ -66,6 +66,33 @@ describe("API", () => {
     expect(body.message).toMatch(/Search completed/i);
   });
 
+  it("auto-creates target index during bulk indexing", async () => {
+    const headers = { authorization: "Bearer test-key" };
+    const res = await app.inject({
+      method: "POST",
+      url: "/v1/indexes/auto_created_idx/documents/_bulk",
+      headers,
+      payload: {
+        documents: [
+          { id: "b1", fields: { title: "Auto Created Index", category: "test" } },
+        ],
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.ok).toBe(true);
+    expect(body.result.indexed).toBe(1);
+
+    const getIdx = await app.inject({
+      method: "GET",
+      url: "/v1/indexes/auto_created_idx",
+      headers,
+    });
+    expect(getIdx.statusCode).toBe(200);
+    expect(getIdx.json().index.docCount).toBe(1);
+  });
+
+
   it("health is public", async () => {
     const res = await app.inject({ method: "GET", url: "/health" });
     expect(res.statusCode).toBe(200);
