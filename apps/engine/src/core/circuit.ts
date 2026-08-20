@@ -1,3 +1,5 @@
+import v8 from "node:v8";
+
 /**
  * Lightweight circuit breakers — protect the in-process engine from runaway load.
  */
@@ -70,11 +72,11 @@ export class CircuitBreakers {
   checkMemory(): void {
     const mem = process.memoryUsage();
     const heapUsedMb = mem.heapUsed / (1024 * 1024);
-    const heapTotalMb = mem.heapTotal / (1024 * 1024);
+    const heapLimitMb = v8.getHeapStatistics().heap_size_limit / (1024 * 1024);
     const rssMb = mem.rss / (1024 * 1024);
 
     // 1. Check Heap Utilization Guard (75% warning / 85% backpressure)
-    const heapRatio = heapUsedMb / Math.max(heapTotalMb, 64);
+    const heapRatio = heapUsedMb / heapLimitMb;
     if (heapRatio > 0.85) {
       if (typeof (global as any).gc === "function") {
         try { (global as any).gc(); } catch (_) {}
