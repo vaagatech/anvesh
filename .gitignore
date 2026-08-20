@@ -27,4 +27,5 @@ reports/
 .terraform/
 .terraform.lock.hcl
 *.pem
-
+# Customer distributions
+dist-customer/
