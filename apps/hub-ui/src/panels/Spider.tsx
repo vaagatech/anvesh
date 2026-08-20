@@ -404,66 +404,65 @@ export function SpiderPanel({
           <h2>Saved crawls</h2>
         </div>
         {configs.length === 0 ? (
-          <p className="hint">Save a crawl above, set an index, then Run.</p>
+          <p className="hint">Save a crawl configuration above, then click Run.</p>
         ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Index for Run</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {configs.map((c) => (
-                <tr key={c.id}>
-                  <td>
-                    <strong>{c.name}</strong>
-                  </td>
-                  <td>
-                    <input
-                      list={`run-index-${c.id}`}
-                      value={runIndexById[c.id] ?? c.indexName ?? ""}
-                      onChange={(e) =>
-                        setRunIndexById((prev) => ({ ...prev, [c.id]: e.target.value }))
-                      }
-                      placeholder={indexName || "articles"}
-                      aria-label={`Index for ${c.name}`}
-                    />
-                    <datalist id={`run-index-${c.id}`}>
-                      {indexes.map((i) => (
-                        <option key={i.name} value={i.name} />
-                      ))}
-                    </datalist>
-                  </td>
-                  <td className="row">
-                    <button type="button" className="btn secondary" onClick={() => openEdit(c)}>
-                      Edit
-                    </button>
-                    <button type="button" className="btn" onClick={() => runCrawl(c)}>
-                      Run now
-                    </button>
-                    <button
-                      type="button"
-                      className="btn danger"
-                      onClick={() => {
-                        if (!confirm(`Delete crawl config "${c.name}"?`)) return;
-                        void api
-                          .deleteSpiderConfig(c.id)
-                          .then(async () => {
-                            flash("Deleted.");
-                            await onRefresh();
-                          })
-                          .catch((e) => flash(e.message, "err"));
-                      }}
-                    >
-                      Delete
-                    </button>
-                  </td>
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Crawl Name</th>
+                  <th>Target Index</th>
+                  <th>Worker Instance</th>
+                  <th>Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {configs.map((c) => (
+                  <tr key={c.id}>
+                    <td>
+                      <strong>{c.name}</strong>
+                    </td>
+                    <td>
+                      <span className="badge ok">
+                        {c.indexName || "auto-generated"}
+                      </span>
+                    </td>
+                    <td>
+                      <span style={{ fontSize: "0.85rem", color: "var(--c-text-2)" }}>
+                        {enabledSpiders.find((s) => s.id === c.instanceId)?.name || c.instanceId || "default"}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="btn-group">
+                        <button type="button" className="btn btn-primary btn-sm" onClick={() => runCrawl(c)}>
+                          ▶ Run Crawl
+                        </button>
+                        <button type="button" className="btn btn-secondary btn-sm" onClick={() => openEdit(c)}>
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-danger btn-sm"
+                          onClick={() => {
+                            if (!confirm(`Delete crawl config "${c.name}"?`)) return;
+                            void api
+                              .deleteSpiderConfig(c.id)
+                              .then(async () => {
+                                flash("Crawl configuration deleted.");
+                                await onRefresh();
+                              })
+                              .catch((e) => flash(e.message, "err"));
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
 

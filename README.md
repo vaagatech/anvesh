@@ -1,66 +1,83 @@
 # Anvesh
 
-[![docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://vaagatech.github.io/anvesh-monorepo/)
+[![docs](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://vaagatech.github.io/anvesh/)
 [![license](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 [![node](https://img.shields.io/badge/node-%3E%3D20-brightgreen)](https://nodejs.org)
 
-**Lightweight enterprise-grade search engine & vector database in Node.js** — BM25 full-text, multi-metric vector DB (HNSW, SQ8), hybrid RRF scoring, sub-millisecond caching, distributed file system (DFS) storage, scatter-gather clustering, hub control plane (RBAC), indexer, spider, and setup — by [VaagaTech](https://www.vaagatech.com).
+**Lightweight enterprise-grade search engine & vector database in Node.js** — BM25 full-text, multi-metric vector DB (HNSW, SQ8), hybrid RRF scoring, sub-millisecond caching, tiered distributed storage (DFS + OCI object store), scatter-gather clustering, built-in telemetry & observability, zero-drop Dead-Letter Queue (DLQ), automated web crawler (Spider), bulk indexer, and Hub control plane (Cognito RBAC) — by [VaagaTech](https://www.vaagatech.com).
 
-**Docs:** [vaagatech.github.io/anvesh-monorepo](https://vaagatech.github.io/anvesh-monorepo/) · enable Pages from `/docs` ([guide](./docs/github-pages.md))
+**Documentation:** [vaagatech.github.io/anvesh](https://vaagatech.github.io/anvesh/)
 
-**Start here:** [Product Features](./docs/features.md) · [Market Comparison](./docs/market-comparison.md) · [Why Anvesh](./docs/why-anvesh.md) · [Use cases](./docs/use-cases.md)
+**Explore:** [Product Features](https://vaagatech.github.io/anvesh/features) · [Architecture](https://vaagatech.github.io/anvesh/architecture) · [Market Comparison](https://vaagatech.github.io/anvesh/market-comparison) · [Why Anvesh](https://vaagatech.github.io/anvesh/why-anvesh) · [Interactive Demo](https://vaagatech.github.io/anvesh/demo)
+
+---
+
+## Workspace Packages
 
 | Package | Role |
-|---------|------|
-| `@vaagatech/anvesh-engine` | Search & Vector DB API (BM25, HNSW, SQ8, RRF, DFS, Geo) |
-| `@vaagatech/anvesh-hub` | Control plane + modern UI (RBAC, multi-instance) |
-| `@vaagatech/anvesh-indexer` | Bulk indexer (+ `serve` worker) |
-| `@vaagatech/anvesh-spider` | Site crawler (+ `serve` worker, role-based login) |
-| `@vaagatech/anvesh-setup` | Easy local installer |
-| `@vaagatech/anvesh-shared` | Shared contracts |
-| `@vaagatech/anvesh-plugins` | Plugin host (LLM-tool style) |
-| `@vaagatech/vaakly` | API summary messaging plugin |
+|---|---|
+| `@vaagatech/anvesh-engine` | Search & Vector DB Core (BM25, HNSW, SQ8, RRF, DFS, Geo, DLQ) |
+| `@vaagatech/anvesh-hub-api` | Control plane Fastify backend + Cognito JWT Authorizer |
+| `@vaagatech/anvesh-hub-ui` | Modern React 19 Hub UI (Redesigned Theme, Live Observability, Search Studio) |
+| `@vaagatech/anvesh-spider` | Automated web crawler worker with role-based auth & auto-indexing |
+| `@vaagatech/anvesh-indexer` | High-throughput bulk stream ingestion worker |
+| `@vaagatech/anvesh-setup` | Zero-configuration local cluster installer |
+| `@vaagatech/anvesh-shared` | Shared TypeScript schemas, contracts & telemetry types |
+| `@vaagatech/anvesh-plugins` | Extensible plugin runtime host |
 
-## Easy local setup
+---
 
+## Key Capabilities
+
+- ⚡ **Hybrid Search & Vector Retrieval**: BM25 inverted index combined with dense vector semantic search using Reciprocal Rank Fusion (RRF) and cosine / euclidean / dot product distance.
+- 📉 **SQ8 Vector Quantization**: 8-bit scalar quantization reducing vector RAM footprint by 75% with >98% recall accuracy.
+- 💾 **Tiered Storage & OCI Object Store**: Hot in-memory segments, warm local SSD storage, and cold cloud object storage tiering with immutable segment blocks.
+- 🛡️ **Zero-Drop Dead-Letter Queue (DLQ)**: Isolated persistence for corrupted or malformed documents with automated retry policies and one-click replay into search indices.
+- 📊 **Embedded Observability & Live Telemetry**: Real-time QPS charts, latency percentiles (p50, p95, p99), memory breakdown (RSS, Heap, Segments), and distributed node health tracking.
+- 🕷️ **Automated Web Crawler (Spider)**: Configurable multi-worker site crawler with automatic schema detection, depth control, and instant vector embedding.
+- 🔐 **Hub Control Plane & RBAC**: Centralized management with AWS Cognito JWT authentication, multi-cluster federation, and role-based permissions (`admin`, `operator`, `viewer`).
+
+---
+
+## Quickstart
+
+### 1. Install & Launch All Services
 ```bash
 npm install
-npm start                 # build (if needed) → init → engine + hub + spider + indexer
+npm start                 # build → init → engine + hub + spider + indexer
 ```
 
-Optional demo corpus:
+Optional: Seed with sample demo corpus:
+```bash
+npm start -- --seed       # starts cluster and seeds "demo" index
+```
+
+### 2. Access the Hub UI
+Open **[http://127.0.0.1:3849](http://127.0.0.1:3849)** in your browser.
+Default credentials will be displayed in the terminal and stored in `.env.anvesh`.
+
+### 3. Stop Cluster
+```bash
+npm run stop
+```
+
+---
+
+## Cloud Deployment (Kubernetes / OCI / AWS)
+
+Anvesh is built for cloud-native deployment with Kubernetes manifests and Terraform templates included in `/infra`:
 
 ```bash
-npm start -- --seed       # same as above, then seed index "demo"
+# Deploy to Kubernetes cluster
+kubectl apply -f infra/k8s/anvesh-k8s.yaml
+
+# Provision AWS API Gateway & Cognito User Pool
+cd infra/terraform && terraform apply
 ```
 
-Open Hub at http://127.0.0.1:3849 (`admin` / password printed by the script, also in `.env.anvesh`). Local instances are registered automatically.
+See the [Deployment Guide](https://vaagatech.github.io/anvesh/deploy) for detailed production setup instructions.
 
-**Operator guide:** [docs/operator-guide.md](./docs/operator-guide.md) · published at [vaagatech.github.io/anvesh-monorepo/operator-guide](https://vaagatech.github.io/anvesh-monorepo/operator-guide/)
-
-Stop with `npm run stop`.
-
-Try-it on Pages: [vaagatech.github.io/anvesh-monorepo/demo](https://vaagatech.github.io/anvesh-monorepo/demo/) (set Engine URL to a seeded public API, or use `http://127.0.0.1:3848` when testing locally with CORS).
-
-## Hub as control plane
-
-When configured, Hub manages:
-
-- Multiple **engine / spider / indexer** instances
-- Index create/delete/mappings on chosen engines
-- Spider & indexer configuration + job runs
-- RBAC: **admin** · **operator** · **viewer**
-
-## Publish (GitHub Actions)
-
-1. Add repo secret `NPM_TOKEN`
-2. On `main`, set the version you want to ship (all packages stay in sync):
-   ```bash
-   npm run version:set -- 0.1.0
-   npm run release -- --push   # commit + tag v0.1.0 + push
-   ```
-3. Tag `vX.Y.Z` triggers publish; then CI bumps **next minor** on `main` (e.g. `0.2.0`)
-4. Pushes to `main` only run a **snapshot** build (test + build, no npm publish)
+---
 
 ## License
 

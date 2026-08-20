@@ -8,38 +8,9 @@
  * Provides true semantic retrieval without requiring heavy local SLM/LLM runtimes.
  */
 import { stem, tokenize, splitCompound } from "./analyzer.js";
-
-const QUESTION_STOPWORDS = new Set([
-  "what", "is", "my", "how", "to", "where", "can", "i", "find", "show",
-  "me", "the", "a", "an", "of", "for", "in", "with", "tell", "about", "get",
-  "which", "who", "whom", "whose", "why", "when", "does", "do", "did"
-]);
-
-const SYNONYM_CLUSTERS: string[][] = [
-  ["user", "userid", "username", "account", "login", "handle", "profile", "identity", "credential", "auth", "member", "customer"],
-  ["password", "passcode", "secret", "pin", "token", "key", "apikey", "jwt", "bearer", "accesskey"],
-  ["price", "cost", "pricing", "fee", "billing", "invoice", "plan", "subscription", "charge", "payment", "tier", "amount"],
-  ["database", "datastore", "db", "sql", "nosql", "postgres", "mysql", "sqlite", "table", "index", "vector", "record", "storage"],
-  ["cloud", "infrastructure", "server", "host", "hosting", "k8s", "kubernetes", "cluster", "node", "instance", "oci", "aws", "oracle", "amazon"],
-  ["search", "query", "find", "retrieve", "lookup", "discover", "seek", "filter", "match", "scan", "browse"],
-  ["error", "bug", "issue", "problem", "fault", "crash", "exception", "failure", "panic", "corrupt", "corruption"],
-  ["speed", "latency", "performance", "fast", "throughput", "benchmark", "qps", "ops", "efficiency", "quick", "optimized"],
-  ["geo", "location", "place", "address", "city", "region", "coordinates", "lat", "lon", "distance", "radius", "map", "bengaluru", "bangalore"],
-  ["crawl", "crawler", "spider", "scrape", "scraping", "site", "webpage", "harvester", "extractor", "html", "url"],
-  ["document", "documents", "article", "post", "content", "corpus", "file", "text", "knowledge", "wiki", "docs"],
-  ["semantic", "meaning", "similarity", "hybrid", "vector", "embedding", "paraphrase", "context", "intent", "dense"],
-  ["settings", "config", "configuration", "preferences", "options", "setup", "parameters", "env"],
-  ["snapshot", "backup", "restore", "revert", "rollback", "version", "history", "point-in-time", "recovery"],
-  ["role", "roles", "rbac", "admin", "operator", "viewer", "permission", "privilege", "scope"]
-];
-
-const SYNONYM_MAP = new Map<string, string[]>();
-for (const group of SYNONYM_CLUSTERS) {
-  const stemmedGroup = [...new Set(group.map((w) => stem(w.toLowerCase())))];
-  for (const t of stemmedGroup) {
-    SYNONYM_MAP.set(t, stemmedGroup.filter((x) => x !== t));
-  }
-}
+import { eng } from "stopword";
+// @ts-ignore
+import synonyms from "synonyms";
 
 function hash32(s: string, seed = 0): number {
   let h = (2166136261 ^ seed) >>> 0;
@@ -54,9 +25,13 @@ function expandTokens(tokens: string[]): string[] {
   const out: string[] = [];
   for (const t of tokens) {
     out.push(t);
-    const syns = SYNONYM_MAP.get(t);
-    if (syns) {
-      for (const s of syns) out.push(s);
+    const synDict = synonyms(t);
+    if (synDict) {
+      for (const pos in synDict) {
+        for (const s of synDict[pos]) {
+          out.push(stem(s.toLowerCase()));
+        }
+      }
     }
   }
   return out;
@@ -85,7 +60,7 @@ export function localEmbed(text: string, dimensions: number): number[] {
   const baseTokens = tokenize(splitText, { stopwords: true, stemming: true });
 
   // 2. Filter conversational question fillers for natural language intent retrieval
-  const meaningful = baseTokens.filter((t) => !QUESTION_STOPWORDS.has(t) && t.length > 1);
+  const meaningful = baseTokens.filter((t) => !eng.includes(t) && t.length > 1);
   const activeTokens = meaningful.length > 0 ? meaningful : baseTokens;
   if (!activeTokens.length) return vec;
 

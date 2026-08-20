@@ -24,6 +24,7 @@ import {
   type AuditEntry,
 } from "./api";
 import { DashboardPanel } from "./panels/Dashboard";
+import { ObservabilityPanel } from "./panels/Observability";
 import { InstancesPanel } from "./panels/Instances";
 import { IndexesPanel } from "./panels/Indexes";
 import { DocumentsPanel } from "./panels/Documents";
@@ -37,6 +38,7 @@ import { DeadLetterPanel } from "./panels/DeadLetter";
 
 type Tab =
   | "dashboard"
+  | "observability"
   | "instances"
   | "indexes"
   | "documents"
@@ -226,9 +228,32 @@ export function App() {
   const spiders = useMemo(() => (instances || []).filter((i) => i && i.kind === "spider"), [instances]);
   const indexers = useMemo(() => (instances || []).filter((i) => i && i.kind === "indexer"), [instances]);
 
-  function flash(msg: string, t: "ok" | "err" = "ok") {
-    setStatus(msg);
+  const [theme, setTheme] = useState<"light" | "dark">(() => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem("anvesh-theme") as "light" | "dark") || "light";
+    }
+    return "light";
+  });
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("anvesh-theme", theme);
+  }, [theme]);
+
+  function toggleTheme() {
+    setTheme((t) => (t === "light" ? "dark" : "light"));
+  }
+
+  function flash(msg: string, t: "ok" | "err" | "warn" = "ok") {
+    let cleanMsg = msg;
+    if (msg.includes("Failed to fetch") || msg.includes("NetworkError")) {
+      cleanMsg = "Network / Gateway unreachable. Check your internet connection or verify worker cluster status.";
+    }
+    setStatus(cleanMsg);
     setTone(t);
+    setTimeout(() => {
+      setStatus((current) => (current === cleanMsg ? null : current));
+    }, t === "err" ? 8000 : 4000);
   }
 
   async function refreshAll() {
@@ -687,9 +712,15 @@ export function App() {
     items: { id: Tab; label: string; show?: boolean }[];
   }[] = [
     {
-      label: "Operate",
+      label: "Overview",
       items: [
         { id: "dashboard", label: "Dashboard" },
+        { id: "observability", label: "Observability & Metrics" },
+      ],
+    },
+    {
+      label: "Operate",
+      items: [
         { id: "instances", label: "Instances" },
         { id: "indexes", label: "Indexes" },
         { id: "documents", label: "Documents" },
@@ -701,7 +732,7 @@ export function App() {
       items: [
         { id: "spider", label: "Web Crawler", show: user.role !== "viewer" },
         { id: "indexer", label: "Bulk Import", show: user.role !== "viewer" },
-        { id: "jobs", label: "Jobs Queue" },
+        { id: "jobs", label: "Job Queue" },
         { id: "deadletter", label: "Dead-Letter Queue", show: user.role !== "viewer" },
       ],
     },
@@ -716,6 +747,7 @@ export function App() {
 
   const tabLabels: Record<Tab, string> = {
     dashboard: "Dashboard",
+    observability: "Observability & Live Metrics",
     instances: "Instances",
     indexes: "Indexes",
     documents: "Documents",
@@ -729,11 +761,12 @@ export function App() {
   };
 
   const ledes: Partial<Record<Tab, string>> = {
-    dashboard: "Cluster node status, live metrics, and setup status",
+    dashboard: "Cluster node status, worker fleet, and operational checklist",
+    observability: "Real-time query latency percentiles, memory efficiency, and distributed telemetry",
     instances: "Manage registered Engine, Spider, and Indexer instances",
-    indexes: "Create and inspect search indexes and mappings",
+    indexes: "Create and inspect search indexes, mappings, and snapshots",
     documents: "Ingest and inspect documents within the active index",
-    search: "Hybrid BM25 and vector search playground",
+    search: "Hybrid BM25 and dense vector search playground",
     spider: "Automated web crawler with role authentication & auto-indexing",
     indexer: "Bulk ingestion worker configurations & HTTP streams",
     jobs: "Background crawl and indexing job execution history & logs",
@@ -750,6 +783,7 @@ export function App() {
         onSelectTab={(t) => setTab(t)}
         tabs={[
           { id: "dashboard", label: "Dashboard", group: "Overview", hint: "Fleet health & checklist" },
+          { id: "observability", label: "Observability & Metrics", group: "Overview", hint: "Real-time QPS & latency" },
           { id: "instances", label: "Instances", group: "Operate", hint: "Manage engine workers" },
           { id: "indexes", label: "Indexes", group: "Operate", hint: "Create/inspect indexes" },
           { id: "documents", label: "Documents", group: "Operate", hint: "Browse and ingest JSON" },
@@ -763,76 +797,118 @@ export function App() {
         ]}
       />
 
+      {/* Floating Toast Notification */}
+      {status && (
+        <div className="toast-container">
+          <div className={`toast ${tone}`} role="status">
+            <span className="toast-icon">
+              {tone === "err" ? "⚠️" : tone === "warn" ? "⚡" : "✓"}
+            </span>
+            <span className="toast-msg">{status}</span>
+            <button
+              type="button"
+              className="toast-close"
+              onClick={() => setStatus(null)}
+              aria-label="Dismiss notification"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="shell">
         {/* Left Sidebar Navigation */}
-        <aside className={`nav${mobileNavOpen ? " mobile-open" : ""}`} aria-label="Hub Navigation">
-          <div className="brand-container">
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
-              <img src="/favicon.svg" alt="Anvesh" style={{ width: "28px", height: "28px", borderRadius: "7px" }} />
-              <span className="brand" style={{ margin: 0, fontSize: "1.4rem" }}>Anvesh</span>
+        <aside className={`nav-sidebar${mobileNavOpen ? " mobile-open" : ""}`} aria-label="Hub Navigation">
+          <div className="nav-brand">
+            <div className="brand-mark">
+              <img src="/favicon.svg" alt="Anvesh" />
             </div>
-            <p className="brand-sub">VaagaTech · {user.role}</p>
+            <span className="brand-title">Anvesh</span>
+            <span className="brand-badge">{user.role}</span>
           </div>
 
-          {navGroups.map((group) => {
-            const visible = group.items.filter((n) => n.show !== false);
-            if (visible.length === 0) return null;
-            return (
-              <div key={group.label} className="nav-group">
-                <p className="nav-label">{group.label}</p>
-                {visible.map((n) => (
-                  <NavLink
-                    key={n.id}
-                    to={`/${n.id}`}
-                    className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}
-                    onClick={() => setMobileNavOpen(false)}
-                  >
-                    {n.label}
-                  </NavLink>
-                ))}
-              </div>
-            );
-          })}
+          <div className="nav-cluster">
+            {navGroups.map((group) => {
+              const visible = group.items.filter((n) => n.show !== false);
+              if (visible.length === 0) return null;
+              return (
+                <div key={group.label}>
+                  <p className="nav-section-title">{group.label}</p>
+                  <ul className="nav-menu">
+                    {visible.map((n) => (
+                      <li key={n.id}>
+                        <NavLink
+                          to={`/${n.id}`}
+                          className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}
+                          onClick={() => setMobileNavOpen(false)}
+                        >
+                          <span>{n.label}</span>
+                        </NavLink>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="nav-footer">
+            <div className="nav-footer-links">
+              <a href="https://vaagatech.github.io/anvesh/" target="_blank" rel="noopener noreferrer">Docs ↗</a>
+              <a href="https://github.com/vaagatech/anvesh" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
+            </div>
+            <span>© 2026 VaagaTech</span>
+          </div>
         </aside>
 
         {/* Main Content Area */}
-        <main className="main" id="main">
-          {/* Header Bar */}
-          <div className="header-bar">
-            <div className="header-title">
-              <h1>{tabLabels[tab]}</h1>
-              {ledes[tab] && <p className="lede">{ledes[tab]}</p>}
+        <div className="main-wrap" id="main">
+          {/* Top Header Bar */}
+          <header className="topbar">
+            <div className="topbar-left">
+              <div>
+                <h1 className="topbar-title">{tabLabels[tab]}</h1>
+              </div>
             </div>
 
-            <div className="header-actions">
+            <div className="topbar-actions">
               <button
                 type="button"
-                className="cmd-trigger-btn"
+                className="btn btn-secondary btn-sm"
                 onClick={() => setCmdOpen(true)}
                 title="Open Command Palette (Cmd+K)"
               >
-                🔍 <span>Search Menu</span> <kbd className="cmd-kbd">⌘K</kbd>
+                🔍 Search Menu <kbd style={{ marginLeft: "4px", opacity: 0.7 }}>⌘K</kbd>
               </button>
-
-              <span className="user-profile-badge">
-                👤 {user.username}
-                <span className={`role-pill ${user.role}`}>{user.role}</span>
-              </span>
 
               <button
                 type="button"
-                className="btn secondary"
-                style={{ padding: "0.4rem 0.85rem", fontSize: "0.85rem" }}
+                className="theme-btn"
+                onClick={toggleTheme}
+                title={`Switch to ${theme === 'light' ? 'dark' : 'light'} mode`}
+                aria-label="Toggle theme"
+              >
+                {theme === 'light' ? '🌙' : '☀️'}
+              </button>
+
+              <div className="user-badge">
+                <span>{user.username}</span>
+                <span className="user-role-badge">{user.role}</span>
+              </div>
+
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
                 onClick={() => setChangePasswordOpen(true)}
                 title="Change Cognito Password"
               >
-                🔑 Password
+                Password
               </button>
 
               <button
                 type="button"
-                className="btn secondary"
-                style={{ padding: "0.4rem 0.85rem", fontSize: "0.85rem" }}
+                className="btn btn-secondary btn-sm"
                 onClick={() =>
                   start(async () => {
                     await api.logout().catch(() => undefined);
@@ -845,186 +921,201 @@ export function App() {
                 Sign Out
               </button>
             </div>
-          </div>
+          </header>
 
-          {status && (
-            <div className={`banner ${tone}`} role="status" aria-live="polite">
-              {status}
-            </div>
-          )}
+          <main className="content-body">
+            {ledes[tab] && (
+              <p className="lede" style={{ marginBottom: "1.25rem" }}>
+                {ledes[tab]}
+              </p>
+            )}
 
-          {/* Sync Context Bar */}
-          <div className="context-bar">
-            <div className="field" style={{ margin: 0 }}>
-              <label>Engine Node</label>
-              <select
-                value={engineId}
-                onChange={(e) => setEngineId(e.target.value)}
-                aria-label="Active engine node"
-              >
-                <option value="">Select Engine…</option>
-                {engines.map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.name} ({e.baseUrl})
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field" style={{ margin: 0 }}>
-              <label>Target Index</label>
-              <select
-                value={indexName}
-                onChange={(e) => setIndexName(e.target.value)}
-                aria-label="Active target index"
-              >
-                <option value="">Select Index…</option>
-                {indexes.map((i) => (
-                  <option key={i.name} value={i.name}>
-                    {i.name} ({i.docCount ?? 0} docs)
-                  </option>
-                ))}
-              </select>
-            </div>
-            <p className="hint context-hint">
-              Context synced across Search, Documents, and Web Crawler.
-            </p>
-          </div>
+            {/* Sync Context Bar - only on tabs that inspect or query active indexes */}
+            {(tab === "indexes" || tab === "documents" || tab === "search") && (
+              <div className="context-bar">
+                <div className="field">
+                  <label>Engine Node</label>
+                  <select
+                    value={engineId}
+                    onChange={(e) => setEngineId(e.target.value)}
+                    aria-label="Active engine node"
+                  >
+                    <option value="">Select Engine…</option>
+                    {engines.map((e) => (
+                      <option key={e.id} value={e.id}>
+                        {e.name} ({e.baseUrl})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <label>Target Index</label>
+                  <select
+                    value={indexName}
+                    onChange={(e) => setIndexName(e.target.value)}
+                    aria-label="Active target index"
+                  >
+                    <option value="">Select Index…</option>
+                    {indexes.map((i) => (
+                      <option key={i.name} value={i.name}>
+                        {i.name} ({i.docCount ?? 0} docs)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <p className="hint context-hint">
+                  Context synced across Search Studio and Documents.
+                </p>
+              </div>
+            )}
 
-          {tab === "dashboard" && (
-            <DashboardPanel
-              engines={engines}
-              spiders={spiders}
-              indexers={indexers}
-              instances={instances}
-              jobs={jobs}
-              auditEntries={auditEntries}
-              onNavigate={setTab}
-              engineId={engineId}
-              indexCount={indexes.length}
-            />
-          )}
+            {tab === "dashboard" && (
+              <DashboardPanel
+                engines={engines}
+                spiders={spiders}
+                indexers={indexers}
+                instances={instances}
+                jobs={jobs}
+                auditEntries={auditEntries}
+                onNavigate={setTab}
+                engineId={engineId}
+                indexCount={indexes.length}
+              />
+            )}
 
-          {tab === "instances" && (
-            <InstancesPanel
-              instances={instances}
-              onChange={refreshAll}
-              flash={flash}
-              canManage={user.role === "admin"}
-            />
-          )}
+            {tab === "observability" && (
+              <ObservabilityPanel
+                engines={engines}
+                instances={instances}
+                engineId={engineId}
+                indexCount={indexes.length}
+              />
+            )}
 
-          {tab === "indexes" && (
-            <IndexesPanel
-              engines={engines}
-              engineId={engineId}
-              setEngineId={setEngineId}
-              indexes={indexes}
-              setIndexes={setIndexes}
-              flash={flash}
-              canManage={user.role !== "viewer"}
-              onNavigateDocuments={(name) => {
-                if (name) setIndexName(name);
-                setTab("documents");
-              }}
-            />
-          )}
+            {tab === "instances" && (
+              <InstancesPanel
+                instances={instances}
+                onChange={refreshAll}
+                flash={flash}
+                canManage={user.role === "admin"}
+              />
+            )}
 
-          {tab === "documents" && (
-            <DocumentsPanel
-              engines={engines}
-              engineId={engineId}
-              setEngineId={setEngineId}
-              indexes={indexes}
-              indexName={indexName}
-              setIndexName={setIndexName}
-              flash={flash}
-              onSearch={() => setTab("search")}
-            />
-          )}
+            {tab === "indexes" && (
+              <IndexesPanel
+                engines={engines}
+                engineId={engineId}
+                setEngineId={setEngineId}
+                indexes={indexes}
+                setIndexes={setIndexes}
+                flash={flash}
+                canManage={user.role !== "viewer"}
+                onNavigateDocuments={(name) => {
+                  if (name) setIndexName(name);
+                  setTab("documents");
+                }}
+              />
+            )}
 
-          {tab === "search" && (
-            <SearchPanel
-              engines={engines}
-              engineId={engineId}
-              setEngineId={setEngineId}
-              indexes={indexes}
-              indexName={indexName}
-              setIndexName={setIndexName}
-              flash={flash}
-            />
-          )}
+            {tab === "documents" && (
+              <DocumentsPanel
+                engines={engines}
+                engineId={engineId}
+                setEngineId={setEngineId}
+                indexes={indexes}
+                indexName={indexName}
+                setIndexName={setIndexName}
+                flash={flash}
+                onSearch={() => setTab("search")}
+              />
+            )}
 
-          {tab === "spider" && user.role !== "viewer" && (
-            <SpiderPanel
-              configs={spiderConfigs}
-              spiders={spiders}
-              indexers={indexers}
-              engines={engines}
-              engineId={engineId}
-              setEngineId={setEngineId}
-              onRefresh={() =>
-                api.listSpiderConfigs().then((r) => setSpiderConfigs(r.configs))
-              }
-              flash={flash}
-              onGoJobs={() => setTab("jobs")}
-            />
-          )}
+            {tab === "search" && (
+              <SearchPanel
+                engines={engines}
+                engineId={engineId}
+                setEngineId={setEngineId}
+                indexes={indexes}
+                indexName={indexName}
+                setIndexName={setIndexName}
+                flash={flash}
+              />
+            )}
 
-          {tab === "indexer" && user.role !== "viewer" && (
-            <IndexerPanel
-              configs={indexerConfigs}
-              indexers={indexers}
-              engines={engines}
-              onRefresh={() =>
-                api.listIndexerConfigs().then((r) => setIndexerConfigs(r.configs))
-              }
-              flash={flash}
-              onGoJobs={() => setTab("jobs")}
-            />
-          )}
+            {tab === "spider" && user.role !== "viewer" && (
+              <SpiderPanel
+                configs={spiderConfigs}
+                spiders={spiders}
+                indexers={indexers}
+                engines={engines}
+                engineId={engineId}
+                setEngineId={setEngineId}
+                onRefresh={() =>
+                  api.listSpiderConfigs().then((r) => setSpiderConfigs(r.configs))
+                }
+                flash={flash}
+                onGoJobs={() => setTab("jobs")}
+              />
+            )}
 
-          {tab === "jobs" && (
-            <JobsPanel flash={flash} canManage={user.role !== "viewer"} />
-          )}
+            {tab === "indexer" && user.role !== "viewer" && (
+              <IndexerPanel
+                configs={indexerConfigs}
+                indexers={indexers}
+                engines={engines}
+                onRefresh={() =>
+                  api.listIndexerConfigs().then((r) => setIndexerConfigs(r.configs))
+                }
+                flash={flash}
+                onGoJobs={() => setTab("jobs")}
+              />
+            )}
 
-          {tab === "deadletter" && (
-            <DeadLetterPanel
-              engines={engines}
-              engineId={engineId}
-              setEngineId={setEngineId}
-              indexes={indexes}
-              indexName={indexName}
-              setIndexName={setIndexName}
-              flash={flash}
-            />
-          )}
+            {tab === "jobs" && (
+              <JobsPanel flash={flash} canManage={user.role !== "viewer"} />
+            )}
 
-          {tab === "audit" && (
-            <AuditPanel
-              entries={auditEntries}
-              total={auditTotal}
-              from={auditFrom}
-              pageSize={auditPageSize}
-              onPage={(next) => setAuditFrom(next)}
-            />
-          )}
+            {tab === "deadletter" && (
+              <DeadLetterPanel
+                engines={engines}
+                engineId={engineId}
+                setEngineId={setEngineId}
+                indexes={indexes}
+                indexName={indexName}
+                setIndexName={setIndexName}
+                flash={flash}
+              />
+            )}
 
-          {tab === "users" && user.role === "admin" && (
-            <UsersPanel
-              users={users}
-              total={usersTotal}
-              from={usersFrom}
-              pageSize={usersPageSize}
-              onPage={setUsersFrom}
-              onRefresh={() =>
-                api.listUsers(usersFrom, usersPageSize).then((r) => {
-                  setUsers(r.users);
-                  setUsersTotal(r.total);
-                })
-              }
-              flash={flash}
-            />
-          )}
+            {tab === "audit" && (
+              <AuditPanel
+                entries={auditEntries}
+                total={auditTotal}
+                from={auditFrom}
+                pageSize={auditPageSize}
+                onPage={(next) => setAuditFrom(next)}
+              />
+            )}
+
+            {tab === "users" && user.role === "admin" && (
+              <UsersPanel
+                users={users}
+                total={usersTotal}
+                from={usersFrom}
+                pageSize={usersPageSize}
+                onPage={setUsersFrom}
+                onRefresh={() =>
+                  api.listUsers(usersFrom, usersPageSize).then((r) => {
+                    setUsers(r.users);
+                    setUsersTotal(r.total);
+                  })
+                }
+                flash={flash}
+              />
+            )}
+          </main>
+        </div>
+      </div>
         
           {/* Change Password Dialog */}
           {changePasswordOpen && (
@@ -1092,9 +1183,6 @@ export function App() {
               </div>
             </>
           )}
-
-        </main>
-      </div>
     </>
   );
 }

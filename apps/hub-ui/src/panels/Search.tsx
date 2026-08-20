@@ -43,19 +43,18 @@ export function SearchPanel({
   const [total, setTotal] = useState(0);
   const [took, setTook] = useState<number | undefined>();
   const [busy, setBusy] = useState(false);
-  const [curl, setCurl] = useState("");
-  const [message, setMessage] = useState("");
+  const [selectedHit, setSelectedHit] = useState<SearchHit | null>(null);
 
   useEffect(() => {
     if (!indexName && indexes[0]) setIndexName(indexes[0].name);
   }, [indexes, indexName, setIndexName]);
 
   const samples: Array<{ label: string; q: string; mode: typeof mode }> = [
-    { label: "exact: BM25", q: "BM25 keyword", mode: "keyword" },
-    { label: "paraphrase: nearby places", q: "places near me on a map", mode: "semantic" },
-    { label: "paraphrase: meaning match", q: "find similar meaning without exact words", mode: "semantic" },
-    { label: "hybrid: crawl site", q: "crawl a website into search", mode: "hybrid" },
-    { label: "hybrid: hub access", q: "admin roles for the control plane", mode: "hybrid" },
+    { label: "Capabilities", q: "WHAT ARE THE CAPABILITIES OF ANVESH", mode: "hybrid" },
+    { label: "Hybrid Search", q: "hybrid full text and vector search", mode: "hybrid" },
+    { label: "Exact BM25", q: "dead letter queue zero drop", mode: "keyword" },
+    { label: "Tiered Storage", q: "OCI object storage tiered segments", mode: "semantic" },
+    { label: "TCO & Cost", q: "85% lower infrastructure cost", mode: "hybrid" },
   ];
 
   async function runSearch(nextFrom = from) {
@@ -72,7 +71,7 @@ export function SearchPanel({
     if (mode !== "geo") payload.q = q;
     if (mode === "semantic" || mode === "hybrid") {
       if (!q.trim() && !vectorJson.trim()) {
-        flash("Enter a query — the engine embeds it locally for semantic/hybrid.", "err");
+        flash("Enter a search term.", "err");
         return;
       }
       if (vectorJson.trim()) {
@@ -106,11 +105,7 @@ export function SearchPanel({
       setTotal(r.total ?? r.hits?.length ?? 0);
       setTook(r.tookMs);
       setFrom(nextFrom);
-      setMessage(r.message ?? "");
-      setCurl(
-        `curl -s http://ENGINE/v1/indexes/${indexName}/search -H 'content-type: application/json' -d '${JSON.stringify(payload)}'`,
-      );
-      flash(r.message || `Found ${r.total ?? 0} hit(s).`);
+      flash(r.message || `Found ${r.total ?? 0} matching document(s).`);
     } catch (e) {
       flash(e instanceof Error ? e.message : "Search failed", "err");
     } finally {
@@ -118,244 +113,217 @@ export function SearchPanel({
     }
   }
 
-  const maxScore = hits.reduce((m, h) => Math.max(m, h.score ?? 0), 0) || 1;
-
   return (
-    <section className="panel search-console">
-      <div className="panel-head">
-        <div>
-          <h2>Search console</h2>
-          <p className="hint">
-            Keyword = BM25 exact terms. Semantic = local embeddings (stems + synonyms). Hybrid =
-            both. Weak noise scores are filtered out.
-          </p>
-        </div>
-      </div>
-
-      <div className="search-hero">
-        <div className="grid-3">
-          <div className="field">
-            <label>Engine</label>
-            <select value={engineId} onChange={(e) => setEngineId(e.target.value)}>
-              <option value="">Select…</option>
-              {engines.map((e) => (
-                <option key={e.id} value={e.id}>
-                  {e.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label>Index</label>
-            <select value={indexName} onChange={(e) => setIndexName(e.target.value)}>
-              <option value="">Select…</option>
-              {indexes.map((i) => (
-                <option key={i.name} value={i.name}>
-                  {i.name}
-                  {i.docCount != null ? ` (${i.docCount})` : ""}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label>Mode</label>
-            <select value={mode} onChange={(e) => setMode(e.target.value as typeof mode)}>
-              <option value="hybrid">Hybrid (recommended)</option>
-              <option value="keyword">Keyword (BM25)</option>
-              <option value="semantic">Semantic</option>
-              <option value="geo">Geo radius</option>
-            </select>
-          </div>
-        </div>
-
-        {mode !== "geo" && (
-          <div className="field">
-            <label>Query</label>
-            <div className="search-row">
-              <input
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder="Try a paraphrase — e.g. places near me on a map"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void runSearch(0);
-                }}
-              />
-              <button type="button" className="btn" disabled={busy} onClick={() => void runSearch(0)}>
-                {busy ? "Searching…" : "Search"}
-              </button>
-            </div>
-            <div className="chip-row" aria-label="Sample queries">
-              {samples.map((sample) => (
-                <button
-                  key={sample.label}
-                  type="button"
-                  className="chip"
-                  onClick={() => {
-                    setQ(sample.q);
-                    setMode(sample.mode);
-                  }}
-                >
-                  {sample.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {(mode === "semantic" || mode === "hybrid") && (
-          <>
-            <button
-              type="button"
-              className="btn ghost"
-              onClick={() => setShowVector((v) => !v)}
-            >
-              {showVector ? "Hide custom vector" : "Bring your own vector (optional)"}
-            </button>
-            {showVector && (
-              <div className="field">
-                <label>Query vector</label>
-                <textarea
-                  value={vectorJson}
-                  onChange={(e) => setVectorJson(e.target.value)}
-                  rows={2}
-                  placeholder="Leave empty for local auto-embed"
-                />
-              </div>
-            )}
-          </>
-        )}
-
-        {mode === "geo" && (
-          <div className="grid-3">
-            <div className="field">
-              <label>Latitude</label>
-              <input type="number" value={lat} onChange={(e) => setLat(e.target.value)} />
-            </div>
-            <div className="field">
-              <label>Longitude</label>
-              <input type="number" value={lon} onChange={(e) => setLon(e.target.value)} />
-            </div>
-            <div className="field">
-              <label>Radius (km)</label>
-              <input
-                type="number"
-                value={distanceKm}
-                onChange={(e) => setDistanceKm(e.target.value)}
-              />
-            </div>
-            <div className="row">
-              <button type="button" className="btn" disabled={busy} onClick={() => void runSearch(0)}>
-                Geo search
-              </button>
-            </div>
-          </div>
-        )}
-
-        <div className="grid-3">
-          <div className="field">
-            <label>Page size</label>
-            <select value={size} onChange={(e) => setSize(Number(e.target.value))}>
-              {[5, 10, 20, 50].map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="field">
-            <label>Highlights</label>
-            <select
-              value={highlight ? "on" : "off"}
-              onChange={(e) => setHighlight(e.target.value === "on")}
-            >
-              <option value="on">On</option>
-              <option value="off">Off</option>
-            </select>
-          </div>
-          <div className="field">
-            <label>Meta</label>
-            <p className="help">
-              {took != null ? `${took} ms · ` : ""}
-              {total} hit{total === 1 ? "" : "s"}
-              {total > 0 ? ` · showing ${from + 1}–${Math.min(from + size, total)}` : ""}
+    <div className="search-studio-wrap">
+      {/* 1. Top Search Header & Mode Bar */}
+      <div className="panel" style={{ margin: 0 }}>
+        <div className="panel-head">
+          <div>
+            <h2>Search Studio & Query Playground</h2>
+            <p className="hint">
+              Test hybrid BM25 + dense vector semantic retrieval, keyword exact matching, and geo-radius filters in real time.
             </p>
           </div>
+          <div className="panel-actions">
+            {took != null && (
+              <span className="badge ok">
+                ⚡ {took.toFixed(2)} ms · {total} hit{total === 1 ? "" : "s"}
+              </span>
+            )}
+          </div>
         </div>
 
-        {mode !== "geo" && (
-          <div className="chip-row" aria-label="Query modifiers">
-            <label className="toggle-chip">
-              <input type="checkbox" checked={fuzzy} onChange={(e) => setFuzzy(e.target.checked)} />
-              Fuzzy
-            </label>
-            <label className="toggle-chip">
-              <input type="checkbox" checked={phrase} onChange={(e) => setPhrase(e.target.checked)} />
-              Phrase
-            </label>
-            <label className="toggle-chip">
-              <input type="checkbox" checked={prefix} onChange={(e) => setPrefix(e.target.checked)} />
-              Prefix
-            </label>
+        {/* Search Input Bar */}
+        <div className="form-stack">
+          <div className="search-bar-row">
+            <input
+              type="search"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search across documents, headings, and vectors… (Press Enter)"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void runSearch(0);
+              }}
+              autoFocus
+            />
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={busy || (!q.trim() && mode !== "geo")}
+              onClick={() => void runSearch(0)}
+              style={{ minWidth: "120px" }}
+            >
+              {busy ? "Searching…" : "Search"}
+            </button>
+          </div>
+
+          {/* Mode Selector Chips */}
+          <div className="mode-chips">
+            <span style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--c-text-3)", marginRight: "0.25rem" }}>
+              MODE:
+            </span>
+            <button
+              type="button"
+              className={`mode-chip ${mode === "hybrid" ? "active" : ""}`}
+              onClick={() => setMode("hybrid")}
+            >
+              ⚡ Hybrid (BM25 + Vector)
+            </button>
+            <button
+              type="button"
+              className={`mode-chip ${mode === "keyword" ? "active" : ""}`}
+              onClick={() => setMode("keyword")}
+            >
+              🔤 Keyword (BM25)
+            </button>
+            <button
+              type="button"
+              className={`mode-chip ${mode === "semantic" ? "active" : ""}`}
+              onClick={() => setMode("semantic")}
+            >
+              🧠 Semantic Vector
+            </button>
+            <button
+              type="button"
+              className={`mode-chip ${mode === "geo" ? "active" : ""}`}
+              onClick={() => setMode("geo")}
+            >
+              🌍 Geo Radius
+            </button>
+          </div>
+
+          {/* Quick Sample Queries */}
+          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexWrap: "wrap", marginTop: "0.25rem" }}>
+            <span style={{ fontSize: "0.78rem", color: "var(--c-text-3)" }}>Try sample:</span>
+            {samples.map((s) => (
+              <button
+                key={s.label}
+                type="button"
+                className="btn btn-secondary btn-sm"
+                style={{ padding: "2px 8px", fontSize: "0.75rem", borderRadius: "999px" }}
+                onClick={() => {
+                  setQ(s.q);
+                  setMode(s.mode);
+                }}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Results List */}
+      <div className="panel" style={{ margin: 0 }}>
+        <div className="panel-head">
+          <h3>Search Results ({total})</h3>
+          <div className="panel-actions">
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <label style={{ fontSize: "0.8rem", color: "var(--c-text-3)" }}>Page Size:</label>
+              <select
+                value={size}
+                onChange={(e) => setSize(Number(e.target.value))}
+                style={{ width: "auto", padding: "0.35rem 1.75rem 0.35rem 0.65rem", fontSize: "0.8rem" }}
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {hits.length === 0 ? (
+          <div style={{ padding: "3rem 1rem", textAlign: "center", color: "var(--c-text-3)" }}>
+            <p style={{ fontSize: "1.1rem", fontWeight: 600, marginBottom: "0.5rem" }}>No documents to display</p>
+            <p className="hint">Type a query above and hit Search to query the inverted index.</p>
+          </div>
+        ) : (
+          <div className="search-results-list">
+            {hits.map((hit, idx) => {
+              const title = hit.source?.fields?.title || hit.source?.fields?.name || hit.id;
+              const body = hit.source?.fields?.body || hit.source?.fields?.description || "";
+              const url = hit.source?.fields?.url;
+              const highlightSnippet = snippetFromHit(hit, "body") || snippetFromHit(hit, "description") || String(body).slice(0, 240);
+
+              return (
+                <div key={hit.id} className="search-hit-card">
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "1rem", marginBottom: "0.35rem" }}>
+                    <h4 className="search-hit-title">
+                      {url ? (
+                        <a href={String(url)} target="_blank" rel="noopener noreferrer">
+                          {String(title)}
+                        </a>
+                      ) : (
+                        String(title)
+                      )}
+                    </h4>
+                    <span className="badge ok" style={{ flexShrink: 0 }}>
+                      #{from + idx + 1} · Score: {Number(hit.score).toFixed(3)}
+                    </span>
+                  </div>
+
+                  {highlightSnippet && (
+                    <div
+                      className="search-hit-snippet"
+                      dangerouslySetInnerHTML={{ __html: highlightSnippet }}
+                    />
+                  )}
+
+                  <div className="search-hit-footer">
+                    {url && (
+                      <span style={{ fontFamily: "var(--font-mono)", color: "var(--c-brand)" }}>
+                        {String(url)}
+                      </span>
+                    )}
+                    {hit.distanceKm != null && (
+                      <span className="badge">{hit.distanceKm.toFixed(1)} km away</span>
+                    )}
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      style={{ marginLeft: "auto", padding: "2px 8px", fontSize: "0.75rem" }}
+                      onClick={() => setSelectedHit(hit)}
+                    >
+                      View Raw JSON
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+
+            <Pager
+              from={from}
+              size={size}
+              total={total}
+              onPageChange={(next) => void runSearch(next)}
+            />
           </div>
         )}
       </div>
 
-      <div className="results-head">
-        <h3>Results</h3>
-      </div>
-
-      <Pager
-        from={from}
-        size={size}
-        total={total}
-        disabled={busy}
-        onChange={(next) => void runSearch(next)}
-      />
-
-      {message && hits.length > 0 && <p className="hint">{message}</p>}
-
-      {hits.length === 0 ? (
-        <p className="hint">
-          No strong hits. Try a sample chip, or re-seed (`npm run demo:seed`) so documents use the
-          latest local embeddings.
-        </p>
-      ) : (
-        hits.map((hit, i) => {
-          const title = snippetFromHit(hit, "title") || hit.id;
-          const body =
-            snippetFromHit(hit, "body") ||
-            snippetFromHit(hit, "description") ||
-            "";
-          const pct = Math.round(((hit.score ?? 0) / maxScore) * 100);
-          return (
-            <article key={hit.id} className="hit">
-              <div className="hit-rank">#{from + i + 1}</div>
-              <h3 dangerouslySetInnerHTML={{ __html: title }} />
-              {body ? <p dangerouslySetInnerHTML={{ __html: body.length > 220 ? `${body.slice(0, 220)}…` : body }} /> : null}
-              <div
-                className="score-bar"
-                title={`score ${Number(hit.score).toFixed(3)}`}
-                aria-hidden="true"
+      {/* Raw JSON Modal */}
+      {selectedHit && (
+        <>
+          <div className="drawer-backdrop" onClick={() => setSelectedHit(null)} aria-hidden="true" />
+          <div className="drawer" role="dialog" aria-modal="true">
+            <div className="panel-head">
+              <h3>Document: {selectedHit.id}</h3>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setSelectedHit(null)}
               >
-                <span style={{ width: `${Math.max(8, pct)}%` }} />
-              </div>
-              <p className="hit-meta">
-                score {Number(hit.score).toFixed(3)}
-                {hit.distanceKm != null ? ` · ${Number(hit.distanceKm).toFixed(1)} km` : ""}
-                {hit.source?.fields?.url ? ` · ${String(hit.source.fields.url)}` : ""}
-                {` · ${hit.id}`}
-              </p>
-            </article>
-          );
-        })
+                ✕ Close
+              </button>
+            </div>
+            <pre style={{ maxHeight: "70vh", overflow: "auto" }}>
+              <code>{JSON.stringify(selectedHit, null, 2)}</code>
+            </pre>
+          </div>
+        </>
       )}
-
-      {curl && (
-        <div className="field" style={{ marginTop: "1rem" }}>
-          <label>Copy as API</label>
-          <textarea readOnly value={curl} rows={2} onFocus={(e) => e.target.select()} />
-        </div>
-      )}
-    </section>
+    </div>
   );
 }

@@ -1,3 +1,6 @@
+import { removeStopwords, eng } from "stopword";
+import natural from "natural";
+
 export function splitCompound(text: string): string {
   return text
     .replace(/([a-z])([A-Z])/g, "$1 $2")
@@ -7,41 +10,12 @@ export function splitCompound(text: string): string {
 
 /**
  * Lightweight English analyzer: normalize, tokenize, stopword filter, stem.
- * Designed for Lambda memory budgets — no native deps.
+ * Now using robust NLP libraries (`stopword` and `natural`).
  */
 
-const STOPWORDS = new Set([
-  "a", "an", "and", "are", "as", "at", "be", "but", "by", "for", "if", "in",
-  "into", "is", "it", "no", "not", "of", "on", "or", "such", "that", "the",
-  "their", "then", "there", "these", "they", "this", "to", "was", "will", "with",
-  "from", "have", "has", "had", "were", "been", "being", "do", "does", "did",
-  "can", "could", "should", "would", "may", "might", "must", "shall", "your",
-  "you", "we", "our", "us", "i", "me", "my", "he", "she", "him", "her", "his",
-]);
-
-/** Porter-like light stemmer (suffix stripping only). */
+/** Porter stemmer via natural library. */
 export function stem(token: string): string {
-  let w = token;
-  if (w.length <= 3) return w;
-  if (w.endsWith("ies") && w.length > 4) w = w.slice(0, -3) + "y";
-  else if (w.endsWith("sses")) w = w.slice(0, -2);
-  else if (w.endsWith("ss")) return w;
-  else if (w.endsWith("s") && !w.endsWith("us") && !w.endsWith("is")) w = w.slice(0, -1);
-  if (w.endsWith("ing") && w.length > 5) {
-    w = w.slice(0, -3);
-    // running → runn → run; stopping → stopp → stop
-    if (w.length >= 3 && w[w.length - 1] === w[w.length - 2] && !"aeiou".includes(w[w.length - 1]!)) {
-      w = w.slice(0, -1);
-    }
-  } else if (w.endsWith("ed") && w.length > 4) {
-    w = w.slice(0, -2);
-    if (w.length >= 3 && w[w.length - 1] === w[w.length - 2] && !"aeiou".includes(w[w.length - 1]!)) {
-      w = w.slice(0, -1);
-    }
-  }
-  if (w.endsWith("ly") && w.length > 4) w = w.slice(0, -2);
-  if (w.endsWith("tion") && w.length > 6) w = w.slice(0, -4) + "t";
-  return w;
+  return natural.PorterStemmer.stem(token);
 }
 
 export function normalize(text: string): string {
@@ -56,9 +30,14 @@ export function tokenize(text: string, options?: { stopwords?: boolean; stemming
   const useStem = options?.stemming !== false;
   const normalized = normalize(text);
   const raw = normalized.match(/[a-z0-9]+(?:'[a-z0-9]+)?/g) ?? [];
+  
+  let tokens: string[] = Array.from(raw);
+  if (useStop) {
+    tokens = removeStopwords(tokens, eng);
+  }
+  
   const out: string[] = [];
-  for (const t of raw) {
-    if (useStop && STOPWORDS.has(t)) continue;
+  for (const t of tokens) {
     if (t.length < 2) continue;
     out.push(useStem ? stem(t) : t);
   }
