@@ -1,77 +1,181 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>{% if page.title %}{{ page.title }} · {% endif %}{{ site.title }}</title>
+  <title>{% if page.title %}{{ page.title }} · {% endif %}{{ site.title }} — Cloud-Native Search & Vector Database</title>
   <meta name="description" content="{{ page.description | default: site.description }}" />
+  <link rel="icon" type="image/svg+xml" href="{{ '/assets/images/favicon.svg' | relative_url }}" />
+  
+  <!-- Typography -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  
+  <!-- CSS -->
   <link rel="stylesheet" href="{{ '/assets/css/site.css' | relative_url }}" />
+  
+  <!-- Initial Theme Script -->
+  <script>
+    (function() {
+      const savedTheme = localStorage.getItem('anvesh-theme') || 'light';
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    })();
+  </script>
 </head>
 <body>
-  <a class="skip-link" href="#main">Skip to content</a>
-  <div class="shell">
-    <aside class="sidebar" aria-label="Documentation">
-      <a class="brand" href="{{ '/' | relative_url }}">Anvesh</a>
-      <p class="brand-sub">Docs · <a href="https://www.vaagatech.com">VaagaTech</a></p>
-      <nav>
-        <p class="nav-label">Start</p>
-        <ul>
-          <li><a href="{{ '/' | relative_url }}">Overview</a></li>
-          <li><a href="{{ '/features/' | relative_url }}">Product Features</a></li>
-          <li><a href="{{ '/market-comparison/' | relative_url }}">Market Comparison</a></li>
-          <li><a href="{{ '/why-anvesh/' | relative_url }}">Why Anvesh</a></li>
-          <li><a href="{{ '/use-cases/' | relative_url }}">Use cases</a></li>
-          <li><a href="{{ '/getting-started/' | relative_url }}">Getting started</a></li>
-          <li><a href="{{ '/demo/' | relative_url }}">Interactive Search Demo</a></li>
-          <li><a href="{{ '/architecture/' | relative_url }}">Architecture</a></li>
-        </ul>
-        <p class="nav-label">Components</p>
-        <ul>
-          <li><a href="{{ '/components/' | relative_url }}">All components</a></li>
-          <li><a href="{{ '/components/engine/' | relative_url }}">Engine</a></li>
-          <li><a href="{{ '/components/hub/' | relative_url }}">Hub</a></li>
-          <li><a href="{{ '/components/indexer/' | relative_url }}">Indexer</a></li>
-          <li><a href="{{ '/components/spider/' | relative_url }}">Spider</a></li>
-          <li><a href="{{ '/components/shared/' | relative_url }}">Shared</a></li>
-          <li><a href="{{ '/components/setup/' | relative_url }}">Setup</a></li>
-        </ul>
-        <p class="nav-label">Guides</p>
-        <ul>
-          <li><a href="{{ '/guides/search/' | relative_url }}">Search modes</a></li>
-          <li><a href="{{ '/guides/geo/' | relative_url }}">Geo search</a></li>
-          <li><a href="{{ '/guides/storage/' | relative_url }}">Storage</a></li>
-          <li><a href="{{ '/guides/crawling/' | relative_url }}">Crawling &amp; roles</a></li>
-          <li><a href="{{ '/guides/indexing/' | relative_url }}">Indexing pipeline</a></li>
-          <li><a href="{{ '/guides/adapters/' | relative_url }}">Search adapters</a></li>
-          <li><a href="{{ '/guides/plugins/' | relative_url }}">Plugins</a></li>
-          <li><a href="{{ '/api/http/' | relative_url }}">HTTP API</a></li>
-          <li><a href="{{ '/api/library/' | relative_url }}">Library API</a></li>
-        </ul>
-        <p class="nav-label">Ship</p>
-        <ul>
-          <li><a href="{{ '/versioning/' | relative_url }}">Versioning &amp; releases</a></li>
-          <li><a href="{{ '/deploy/' | relative_url }}">Deploy</a></li>
-          <li><a href="{{ '/publishing/' | relative_url }}">Publish to npm</a></li>
-          <li><a href="{{ '/github-pages/' | relative_url }}">GitHub Pages setup</a></li>
+  <a class="skip-link" href="#main-content">Skip to content</a>
+  <div class="ambient-glow"></div>
+
+  <!-- Main Site Header -->
+  <header class="site-header">
+    <div class="header-container">
+      <a class="brand-wrapper" href="{{ '/' | relative_url }}">
+        <img src="{{ '/assets/images/anvesh-logo.svg' | relative_url }}" alt="Anvesh Search" height="36" />
+      </a>
+
+      <nav aria-label="Main Navigation">
+        <ul class="nav-links">
+          <li><a href="{{ '/' | relative_url }}" {% if page.url == '/' %}class="active"{% endif %}>Overview</a></li>
+          <li><a href="{{ '/features/' | relative_url }}" {% if page.url contains '/features/' %}class="active"{% endif %}>Features</a></li>
+          <li><a href="{{ '/market-comparison/' | relative_url }}" {% if page.url contains '/market-comparison/' %}class="active"{% endif %}>Comparison</a></li>
+          <li><a href="{{ '/why-anvesh/' | relative_url }}" {% if page.url contains '/why-anvesh/' %}class="active"{% endif %}>Why Anvesh</a></li>
+          <li><a href="{{ '/use-cases/' | relative_url }}" {% if page.url contains '/use-cases/' %}class="active"{% endif %}>Use Cases</a></li>
+          <li><a href="{{ '/getting-started/' | relative_url }}" {% if page.url contains '/getting-started/' %}class="active"{% endif %}>Docs</a></li>
+          <li><a href="{{ '/demo/' | relative_url }}" {% if page.url contains '/demo/' %}class="active"{% endif %}>Live Demo</a></li>
         </ul>
       </nav>
+
+      <div class="header-actions">
+        <button id="themeToggle" class="theme-toggle-btn" aria-label="Toggle theme" title="Toggle Light/Dark Theme">
+          <svg id="sunIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+          <svg id="moonIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+        </button>
+
+        <a href="https://github.com/vaagatech/anvesh-monorepo" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="padding: 0.5rem 0.9rem;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          GitHub
+        </a>
+
+        <a href="{{ '/getting-started/' | relative_url }}" class="btn btn-primary">
+          Quick Start →
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Document Shell with Sidebar -->
+  <div class="doc-shell">
+    <aside class="doc-sidebar" aria-label="Documentation Navigation">
+      <div class="sidebar-search">
+        <input type="text" id="docFilterInput" placeholder="Filter documentation (⌘K)..." aria-label="Filter docs" />
+      </div>
+
+      <div class="sidebar-group">
+        <p class="sidebar-heading">Product &amp; Value</p>
+        <ul class="sidebar-menu">
+          <li><a href="{{ '/' | relative_url }}">Overview</a></li>
+          <li><a href="{{ '/features/' | relative_url }}">Product Features <span class="badge-new">v0.4</span></a></li>
+          <li><a href="{{ '/market-comparison/' | relative_url }}">Market Comparison</a></li>
+          <li><a href="{{ '/why-anvesh/' | relative_url }}">Why Anvesh (TCO)</a></li>
+          <li><a href="{{ '/use-cases/' | relative_url }}">Enterprise Use Cases</a></li>
+          <li><a href="{{ '/demo/' | relative_url }}">Interactive Live Demo</a></li>
+        </ul>
+      </div>
+
+      <div class="sidebar-group">
+        <p class="sidebar-heading">Architecture &amp; Core</p>
+        <ul class="sidebar-menu">
+          <li><a href="{{ '/architecture/' | relative_url }}">Distributed Topology</a></li>
+          <li><a href="{{ '/components/engine/' | relative_url }}">Search Engine (:3848)</a></li>
+          <li><a href="{{ '/components/hub/' | relative_url }}">Hub Control Plane (:3849)</a></li>
+          <li><a href="{{ '/components/spider/' | relative_url }}">Spider Crawler (:3851)</a></li>
+          <li><a href="{{ '/components/indexer/' | relative_url }}">Bulk Indexer (:3852)</a></li>
+          <li><a href="{{ '/components/shared/' | relative_url }}">Dead-Letter &amp; Guard</a></li>
+        </ul>
+      </div>
+
+      <div class="sidebar-group">
+        <p class="sidebar-heading">Developer Guides</p>
+        <ul class="sidebar-menu">
+          <li><a href="{{ '/getting-started/' | relative_url }}">Getting Started in 60s</a></li>
+          <li><a href="{{ '/guides/search/' | relative_url }}">Keyword, Semantic, Geo</a></li>
+          <li><a href="{{ '/guides/storage/' | relative_url }}">Tiered S3 / OCI Storage</a></li>
+          <li><a href="{{ '/guides/adapters/' | relative_url }}">Elasticsearch &amp; Solr APIs</a></li>
+          <li><a href="{{ '/guides/plugins/' | relative_url }}">Plugin Ecosystem</a></li>
+          <li><a href="{{ '/api/http/' | relative_url }}">OpenAPI REST Endpoints</a></li>
+        </ul>
+      </div>
+
+      <div class="sidebar-group">
+        <p class="sidebar-heading">Deployment &amp; Cloud</p>
+        <ul class="sidebar-menu">
+          <li><a href="{{ '/deploy/' | relative_url }}">K3s / Kubernetes / OCI</a></li>
+          <li><a href="{{ '/versioning/' | relative_url }}">Release Pipeline</a></li>
+          <li><a href="{{ '/publishing/' | relative_url }}">NPM Monorepo Packages</a></li>
+        </ul>
+      </div>
     </aside>
-    <div class="content">
-      <header class="top">
-        <p class="eyebrow">{{ page.section | default: "Documentation" }}</p>
-        <h1>{{ page.title }}</h1>
-        {% if page.description %}<p class="lede">{{ page.description }}</p>{% endif %}
+
+    <div class="doc-content">
+      <header class="doc-header">
+        <p class="doc-eyebrow">{{ page.section | default: "Documentation & Technical Reference" }}</p>
+        <h1 class="doc-title">{{ page.title }}</h1>
+        {% if page.description %}
+          <p class="doc-lead">{{ page.description }}</p>
+        {% endif %}
       </header>
-      <main id="main" class="prose">
+
+      <main id="main-content" class="prose">
         {{ content }}
       </main>
-      <footer class="foot">
-        <p>MIT · <a href="https://www.vaagatech.com">VaagaTech</a> · <a href="https://github.com/vaagatech/anvesh-monorepo">GitHub</a></p>
+
+      <footer style="margin-top: 4rem; padding-top: 2rem; border-top: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center; font-size: 0.88rem; color: var(--text-muted);">
+        <p>Released under the MIT License · Copyright &copy; 2026 <a href="https://www.vaagatech.com">VaagaTech</a>.</p>
+        <p><a href="https://github.com/vaagatech/anvesh-monorepo/issues" target="_blank" rel="noopener">Report Issue</a> · <a href="#main-content">Back to top ↑</a></p>
       </footer>
     </div>
   </div>
+
+  <!-- Theme Toggle & Search Filter Scripts -->
+  <script>
+    const themeBtn = document.getElementById('themeToggle');
+    const sunIcon = document.getElementById('sunIcon');
+    const moonIcon = document.getElementById('moonIcon');
+
+    function updateIcons(theme) {
+      if (theme === 'dark') {
+        sunIcon.style.display = 'block';
+        moonIcon.style.display = 'none';
+      } else {
+        sunIcon.style.display = 'none';
+        moonIcon.style.display = 'block';
+      }
+    }
+
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+    updateIcons(currentTheme);
+
+    themeBtn.addEventListener('click', () => {
+      const activeTheme = document.documentElement.getAttribute('data-theme');
+      const newTheme = activeTheme === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', newTheme);
+      localStorage.setItem('anvesh-theme', newTheme);
+      updateIcons(newTheme);
+    });
+
+    // Client-side docs menu filter
+    const docFilterInput = document.getElementById('docFilterInput');
+    if (docFilterInput) {
+      docFilterInput.addEventListener('input', (e) => {
+        const query = e.target.value.toLowerCase();
+        const items = document.querySelectorAll('.sidebar-menu li');
+        items.forEach(li => {
+          const text = li.textContent.toLowerCase();
+          li.style.display = text.includes(query) ? '' : 'none';
+        });
+      });
+    }
+  </script>
 </body>
 </html>

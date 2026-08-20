@@ -754,7 +754,10 @@ export function App() {
         {/* Left Sidebar Navigation */}
         <aside className={`nav${mobileNavOpen ? " mobile-open" : ""}`} aria-label="Hub Navigation">
           <div className="brand-container">
-            <p className="brand">Anvesh</p>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
+              <img src="/favicon.svg" alt="Anvesh" style={{ width: "28px", height: "28px", borderRadius: "7px" }} />
+              <span className="brand" style={{ margin: 0, fontSize: "1.4rem" }}>Anvesh</span>
+            </div>
             <p className="brand-sub">VaagaTech · {user.role}</p>
           </div>
 
