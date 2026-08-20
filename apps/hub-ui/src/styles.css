@@ -485,6 +485,7 @@ pre code {
 }
 
 /* Input Fields */
+input:not([type]),
 input[type="text"],
 input[type="email"],
 input[type="password"],
@@ -1154,6 +1155,12 @@ td strong {
   letter-spacing: 0.08em;
   color: var(--c-brand);
   margin-bottom: 0.25rem;
+}
+
+.login-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
 }
 
 .auth-tabs {
