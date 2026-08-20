@@ -53,7 +53,15 @@ async function hub<T = Record<string, unknown>>(
 }
 
 export const api = {
-  health: () => hub<{ users: number; instances: number; message: string }>("/hub/health"),
+  health: () => hub<{
+    users: number;
+    instances: number;
+    message: string;
+    systemStats?: {
+      memory: { total: number; free: number; usagePercent: number };
+      cpu: { load: number; cores: number; usagePercent: number };
+    };
+  }>("/hub/health"),
   login: (username: string, password: string) =>
     hub<{ token: string; user: HubUser; message: string }>("/hub/auth/login", {
       method: "POST",
@@ -352,6 +360,10 @@ export interface FleetHealthRow {
   status: number;
   latencyMs: number;
   message: string;
+  systemStats?: {
+    memory: { total: number; free: number; usagePercent: number };
+    cpu: { load: number; cores: number; usagePercent: number };
+  };
 }
 
 export interface AuditEntry {

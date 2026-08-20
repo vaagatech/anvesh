@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import Fastify from "fastify";
+import os from "os";
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 import path from "node:path";
@@ -68,15 +69,22 @@ function findSearchInstance(instances: HubInstance[], instanceId: string) {
   return instances.find((i) => i.id === instanceId && isHubSearchInstanceKind(i.kind));
 }
 
-async function checkInstanceHealth(store: HubStore, inst: HubInstance): Promise<boolean> {
+async function checkInstanceHealth(store: HubStore, inst: HubInstance): Promise<{ ok: boolean; systemStats?: any }> {
   if (isSearchBackendHubKind(inst.kind)) {
-    return searchBackendFor(store, inst).health();
+    const ok = await searchBackendFor(store, inst).health();
+    return { ok };
   }
-  const res = await fetch(`${inst.baseUrl}/health`, {
-    headers: instKey(store, inst) ? { authorization: `Bearer ${instKey(store, inst)}` } : {},
-    signal: AbortSignal.timeout(4000),
-  });
-  return res.ok;
+  try {
+    const res = await fetch(`${inst.baseUrl}/health`, {
+      headers: instKey(store, inst) ? { authorization: `Bearer ${instKey(store, inst)}` } : {},
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!res.ok) return { ok: false };
+    const data = await res.json().catch(() => ({}));
+    return { ok: true, systemStats: (data as any).systemStats || (data as any).stats?.systemStats };
+  } catch {
+    return { ok: false };
+  }
 }
 
 function stripSearchByAcl(json: unknown, allowed: string[] | null): unknown {
@@ -429,6 +437,13 @@ export async function createHubServer(options?: {
 
   app.get("/hub/health", async () => {
     const s = await store.getState();
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    const usedMem = totalMem - freeMem;
+    const cpuCores = os.cpus().length;
+    const cpuLoad = os.loadavg()[0]; // 1-minute load average
+    const cpuUsagePercent = Math.min(100, Math.round((cpuLoad / cpuCores) * 100));
+
     return {
       ok: true,
       product: "Anvesh Hub",
@@ -436,6 +451,18 @@ export async function createHubServer(options?: {
       users: s.users.length,
       instances: s.instances.length,
       message: "Anvesh Hub is healthy and ready to manage your search stack.",
+      systemStats: {
+        memory: {
+          total: totalMem,
+          free: freeMem,
+          usagePercent: Math.round((usedMem / totalMem) * 100),
+        },
+        cpu: {
+          load: cpuLoad,
+          cores: cpuCores,
+          usagePercent: cpuUsagePercent,
+        },
+      },
     };
   });
 
@@ -1868,7 +1895,7 @@ export async function createHubServer(options?: {
       s.instances.map(async (inst) => {
         const started = Date.now();
         try {
-          const ok = await checkInstanceHealth(store, inst);
+          const { ok, systemStats } = await checkInstanceHealth(store, inst);
           return {
             id: inst.id,
             name: inst.name,
@@ -1879,6 +1906,7 @@ export async function createHubServer(options?: {
             status: ok ? 200 : 503,
             latencyMs: Date.now() - started,
             message: ok ? "Reachable" : "Unhealthy",
+            systemStats,
           };
         } catch (err) {
           return {

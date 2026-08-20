@@ -435,25 +435,66 @@ export class InvertedIndex {
     terms: Set<string>,
   ): Record<string, string[]> {
     const out: Record<string, string[]> = {};
+    if (terms.size === 0) return out;
+
     for (const field of fields) {
       const text = fieldToText(doc.fields[field]);
       if (!text) continue;
-      const snippets: string[] = [];
+      
       const lower = text.toLowerCase();
+      const matches: { start: number; end: number; term: string }[] = [];
+      
       for (const term of terms) {
-        const idx = lower.indexOf(term.slice(0, Math.min(term.length, 4)));
-        if (idx >= 0) {
-          const start = Math.max(0, idx - 40);
-          const end = Math.min(text.length, idx + term.length + 40);
-          let snip = text.slice(start, end);
-          for (const t of terms) {
-            const re = new RegExp(`(${escapeRegExp(t)})`, "ig");
-            snip = snip.replace(re, "<em>$1</em>");
-          }
-          snippets.push((start > 0 ? "…" : "") + snip + (end < text.length ? "…" : ""));
+        const searchStr = term.length > 4 ? term.slice(0, 4) : term;
+        let idx = -1;
+        while ((idx = lower.indexOf(searchStr, idx + 1)) >= 0) {
+          matches.push({ start: idx, end: idx + searchStr.length, term });
         }
       }
-      if (snippets.length) out[field] = snippets.slice(0, 3);
+
+      if (matches.length === 0) continue;
+      matches.sort((a, b) => a.start - b.start);
+
+      let bestWindow = { start: 0, end: 0, score: 0 };
+      const WINDOW_SIZE = 150;
+
+      for (let i = 0; i < matches.length; i++) {
+        const windowStart = matches[i]!.start;
+        const windowEnd = windowStart + WINDOW_SIZE;
+        const uniqueTerms = new Set<string>();
+        let lastMatchEnd = windowStart;
+
+        for (let j = i; j < matches.length; j++) {
+          if (matches[j]!.start > windowEnd) break;
+          uniqueTerms.add(matches[j]!.term);
+          lastMatchEnd = Math.max(lastMatchEnd, matches[j]!.end);
+        }
+
+        const score = uniqueTerms.size;
+        if (score > bestWindow.score) {
+          bestWindow = { start: windowStart, end: lastMatchEnd, score };
+        }
+      }
+
+      let snipStart = Math.max(0, bestWindow.start - 40);
+      let snipEnd = Math.min(text.length, bestWindow.end + 40);
+
+      if (snipStart > 0) {
+        const spaceIdx = text.lastIndexOf(" ", snipStart);
+        if (spaceIdx !== -1) snipStart = spaceIdx + 1;
+      }
+      if (snipEnd < text.length) {
+        const spaceIdx = text.indexOf(" ", snipEnd);
+        if (spaceIdx !== -1) snipEnd = spaceIdx;
+      }
+
+      let snip = text.slice(snipStart, snipEnd);
+      for (const t of terms) {
+        const re = new RegExp(`(${escapeRegExp(t)})`, "ig");
+        snip = snip.replace(re, "<em>$1</em>");
+      }
+
+      out[field] = [(snipStart > 0 ? "… " : "") + snip.trim() + (snipEnd < text.length ? " …" : "")];
     }
     return out;
   }

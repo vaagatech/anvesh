@@ -6,6 +6,8 @@
 import { createServer } from "node:http";
 import { Writable } from "node:stream";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
+import * as http from "node:http";
+import * as os from "node:os";
 import path from "node:path";
 import Database from "better-sqlite3";
 import pino from "pino";
@@ -339,6 +341,17 @@ export function startSpiderServer(port = Number(process.env.ANVESH_SPIDER_PORT ?
       if (req.method === "GET" && url.pathname === "/health") {
         const resStats = globalResourceGuard.stats();
         const dlStats = globalDeadLetter.stats();
+        
+        const totalMem = os.totalmem();
+        const freeMem = os.freemem();
+        const usedMem = totalMem - freeMem;
+        const cpuCores = os.cpus().length;
+        const cpuLoad = os.loadavg()[0] || 0;
+        const systemStats = {
+          memory: { total: totalMem, free: freeMem, usagePercent: Math.round((usedMem / totalMem) * 100) },
+          cpu: { load: cpuLoad, cores: cpuCores, usagePercent: Math.min(100, Math.round((cpuLoad / cpuCores) * 100)) }
+        };
+
         res.writeHead(200, { "content-type": "application/json" });
         res.end(
           JSON.stringify({
@@ -349,6 +362,7 @@ export function startSpiderServer(port = Number(process.env.ANVESH_SPIDER_PORT ?
             totalJobs: jobs.size,
             resourceGuard: resStats,
             deadLetter: dlStats,
+            systemStats,
           }),
         );
         return;

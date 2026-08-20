@@ -36,6 +36,10 @@ export function DashboardPanel({
   const [fleetMsg, setFleetMsg] = useState("Checking cluster fleet…");
   const [checking, setChecking] = useState(false);
   const [deadLetterCount, setDeadLetterCount] = useState<number>(0);
+  const [systemStats, setSystemStats] = useState<{
+    memory: { total: number; free: number; usagePercent: number };
+    cpu: { load: number; cores: number; usagePercent: number };
+  } | null>(null);
 
   const running = useMemo(
     () => jobs.filter((j) => j.status === "running" || j.status === "queued"),
@@ -52,6 +56,10 @@ export function DashboardPanel({
       setFleetMsg(r.message);
       const dl = await api.listDeadLetter(undefined, undefined, 1);
       setDeadLetterCount(dl.total ?? 0);
+      const h = await api.health();
+      if (h.systemStats) {
+        setSystemStats(h.systemStats);
+      }
     } catch (e) {
       setFleetMsg(e instanceof Error ? e.message : "Fleet check failed");
     } finally {
@@ -108,6 +116,25 @@ export function DashboardPanel({
           </p>
           <p className="stat-detail">Job Errors Logged</p>
         </div>
+
+        {systemStats && (
+          <>
+            <div className="stat-card">
+              <p className="stat-label">CPU Usage (Hub)</p>
+              <p className="stat-value" style={{ color: systemStats.cpu.usagePercent > 80 ? "var(--status-err)" : systemStats.cpu.usagePercent > 50 ? "var(--signal-gold)" : "var(--cobalt-bright)" }}>
+                {systemStats.cpu.usagePercent}%
+              </p>
+              <p className="stat-detail">{systemStats.cpu.cores} Cores</p>
+            </div>
+            <div className="stat-card">
+              <p className="stat-label">RAM Usage (Hub)</p>
+              <p className="stat-value" style={{ color: systemStats.memory.usagePercent > 85 ? "var(--status-err)" : "var(--cobalt-bright)" }}>
+                {systemStats.memory.usagePercent}%
+              </p>
+              <p className="stat-detail">{Math.round((systemStats.memory.total - systemStats.memory.free) / 1024 / 1024 / 1024 * 10) / 10}GB / {Math.round(systemStats.memory.total / 1024 / 1024 / 1024 * 10) / 10}GB</p>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Cluster Node Health Cards */}
@@ -163,6 +190,23 @@ export function DashboardPanel({
                   <p style={{ fontSize: "0.8rem", color: "var(--text-subtle)", fontFamily: "var(--font-mono)", margin: 0 }}>
                     {f.baseUrl}
                   </p>
+                  
+                  {f.systemStats && (
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem", marginTop: "1rem", borderTop: "1px solid var(--border)", paddingTop: "0.75rem" }}>
+                      <div>
+                        <div style={{ fontSize: "0.7rem", textTransform: "uppercase", color: "var(--text-subtle)", fontWeight: 600 }}>CPU</div>
+                        <div style={{ fontSize: "0.9rem", color: f.systemStats.cpu.usagePercent > 80 ? "var(--status-err)" : f.systemStats.cpu.usagePercent > 50 ? "var(--signal-gold)" : "var(--status-ok)" }}>
+                          {f.systemStats.cpu.usagePercent}%
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: "0.7rem", textTransform: "uppercase", color: "var(--text-subtle)", fontWeight: 600 }}>RAM</div>
+                        <div style={{ fontSize: "0.9rem", color: f.systemStats.memory.usagePercent > 85 ? "var(--status-err)" : "var(--status-ok)" }}>
+                          {f.systemStats.memory.usagePercent}%
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <button
                   type="button"

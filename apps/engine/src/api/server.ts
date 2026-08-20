@@ -1,5 +1,6 @@
 import { globalAnalytics } from "../core/analytics.js";
 import { randomUUID } from "node:crypto";
+import os from "node:os";
 import Fastify, {
   type FastifyInstance,
   type FastifyReply,
@@ -214,6 +215,17 @@ export async function createAnveshApp(options: AnveshServerOptions = {}): Promis
     const uptimeMs = Math.round(process.uptime() * 1000);
     const resourceStats = globalResourceGuard.stats();
     const deadLetterStats = globalDeadLetter.stats();
+    
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    const usedMem = totalMem - freeMem;
+    const cpuCores = os.cpus().length;
+    const cpuLoad = os.loadavg()[0] || 0;
+    const systemStats = {
+      memory: { total: totalMem, free: freeMem, usagePercent: Math.round((usedMem / totalMem) * 100) },
+      cpu: { load: cpuLoad, cores: cpuCores, usagePercent: Math.min(100, Math.round((cpuLoad / cpuCores) * 100)) }
+    };
+
     logMessage("OK_HEALTH", { uptimeMs, storage: storage.name });
     return apiEnvelope("OK_HEALTH", {
       status: "ok",
@@ -225,6 +237,7 @@ export async function createAnveshApp(options: AnveshServerOptions = {}): Promis
       deadLetter: deadLetterStats,
       vendor: "VaagaTech",
       product: "Anvesh",
+      systemStats,
     }, { uptimeMs, storage: storage.name });
   });
 

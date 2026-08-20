@@ -5,11 +5,12 @@ import { globalResourceGuard } from "@vaagatech/anvesh-shared";
  */
 import { createServer } from "node:http";
 import { spawn } from "node:child_process";
+import * as http from "node:http";
+import * as os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { mkdirSync, createWriteStream } from "node:fs";
 import { pipeline } from "node:stream/promises";
-import os from "node:os";
 import { randomUUID } from "node:crypto";
 import Database from "better-sqlite3";
 import pino from "pino";
@@ -234,6 +235,17 @@ export function startIndexerServer(port = Number(process.env.ANVESH_INDEXER_PORT
     if (req.method === "GET" && url.pathname === "/health") {
       const resStats = globalResourceGuard.stats();
       const dlStats = globalDeadLetter.stats();
+      
+      const totalMem = os.totalmem();
+      const freeMem = os.freemem();
+      const usedMem = totalMem - freeMem;
+      const cpuCores = os.cpus().length;
+      const cpuLoad = os.loadavg()[0] || 0;
+      const systemStats = {
+        memory: { total: totalMem, free: freeMem, usagePercent: Math.round((usedMem / totalMem) * 100) },
+        cpu: { load: cpuLoad, cores: cpuCores, usagePercent: Math.min(100, Math.round((cpuLoad / cpuCores) * 100)) }
+      };
+
       res.writeHead(200, { "content-type": "application/json" });
       res.end(
         JSON.stringify({
@@ -243,6 +255,7 @@ export function startIndexerServer(port = Number(process.env.ANVESH_INDEXER_PORT
           totalJobs: jobs.size,
           resourceGuard: resStats,
           deadLetter: dlStats,
+          systemStats,
         }),
       );
       return;
