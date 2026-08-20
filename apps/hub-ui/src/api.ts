@@ -26,12 +26,19 @@ async function hub<T = Record<string, unknown>>(
   path: string,
   init: RequestInit = {},
 ): Promise<T> {
+  const method = (init.method || "GET").toUpperCase();
   const headers = new Headers(init.headers);
-  if (!headers.has("content-type") && init.body) headers.set("content-type", "application/json");
+  if (!headers.has("content-type")) {
+    headers.set("content-type", "application/json");
+  }
   const token = getToken();
   if (token) headers.set("authorization", `Bearer ${token}`);
   const url = API_BASE ? `${API_BASE}${path.startsWith("/") ? path : `/${path}`}` : path;
-  const res = await fetch(url, { ...init, headers });
+  const body =
+    (method === "POST" || method === "PUT" || method === "PATCH") && init.body === undefined
+      ? "{}"
+      : init.body;
+  const res = await fetch(url, { ...init, headers, body });
   const json = (await res.json().catch(() => ({}))) as T & { message?: string; ok?: boolean };
   if (!res.ok) {
     if (res.status === 401) {

@@ -309,6 +309,20 @@ export async function createHubServer(options?: {
     strictPreflight: false,
   });
 
+  // Resilient content type parser to avoid 415 errors on empty bodies or proxies
+  app.addContentTypeParser(["", "application/octet-stream", "text/plain"], { parseAs: "string" }, (_req, body: string | Buffer, done) => {
+    const text = typeof body === "string" ? body : (body ? body.toString("utf8") : "");
+    if (!text || text.trim().length === 0) {
+      done(null, {});
+      return;
+    }
+    try {
+      done(null, JSON.parse(text));
+    } catch {
+      done(null, {});
+    }
+  });
+
 
   const staleMinutes = Math.max(
     1,
