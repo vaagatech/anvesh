@@ -1,8 +1,10 @@
-/**
- * Full-site spider with role-based sessions (guest / user / admin / …).
- * Discovers pages visible only after login for each configured role.
- */
-import type { CrawledPage, CrawlRole, SpiderConfig } from "@vaagatech/anvesh-shared";
+import {
+  type CrawledPage,
+  type CrawlRole,
+  type SpiderConfig,
+  globalDeadLetter,
+  globalResourceGuard,
+} from "@vaagatech/anvesh-shared";
 import v8 from "node:v8";
 import { RoleSession } from "./session.js";
 import { parseSitemapUrls, RobotsRules } from "./robots.js";
@@ -213,18 +215,16 @@ export class SiteSpider {
     const pendingChunk: CrawledPage[] = [];
 
     const flushChunk = async (force = false) => {
-      const heapStats = v8.getHeapStatistics();
-      const heapLimit = heapStats.heap_size_limit;
-      const heapUsed = process.memoryUsage().heapUsed;
-      const heapMb = Math.round(heapUsed / 1024 / 1024);
-      const heapPercent = (heapUsed / heapLimit) * 100;
-      const heapHigh = heapPercent >= DEFAULT_HEAP_WATCH_PERCENT;
+      const resGuard = globalResourceGuard.check();
+      const avgPageBytes = pendingChunk.length ? Math.round(pendingChunk.reduce((a, b) => a + (b.text?.length || 0), 0) / pendingChunk.length) : 5000;
+      const targetChunkSize = globalResourceGuard.calculateAdaptiveChunkSize(pendingChunk.length, avgPageBytes, chunkSize);
 
-      if (onChunk && (pendingChunk.length >= chunkSize || (pendingChunk.length > 0 && (force || heapHigh)))) {
+      if (onChunk && (pendingChunk.length >= targetChunkSize || (pendingChunk.length > 0 && (force || !resGuard.ok || resGuard.status === "warning")))) {
+        await globalResourceGuard.throttleIfNeeded("spider.flushChunk");
         const batch = pendingChunk.splice(0, pendingChunk.length);
         this.log.info(
-          { count: batch.length, heapUsedMb: heapMb, heapPercent: Math.round(heapPercent) },
-          `Flushing chunk of ${batch.length} page(s) to pipeline (heap: ${heapMb}MB / ${Math.round(heapPercent)}% of heap limit, trigger: ${DEFAULT_HEAP_WATCH_PERCENT}%).`,
+          { count: batch.length, heapRatio: resGuard.heapRatio, status: resGuard.status },
+          `Flushing chunk of ${batch.length} page(s) to pipeline (heap ratio: ${resGuard.heapRatio}).`,
         );
         await onChunk(batch);
       }
@@ -351,8 +351,14 @@ export class SiteSpider {
       const errDetail = causeMsg ? `${errMsg} (${causeMsg})` : errMsg;
       this.log.warn(
         { url: item.url, role: role.name, err: errDetail },
-        "Fetch failed for URL.",
+        "Fetch failed for URL — isolated to dead-letter queue.",
       );
+      globalDeadLetter.record({
+        recordId: item.url,
+        source: "spider",
+        error: err instanceof Error ? err : errDetail,
+        payload: { url: item.url, depth: item.depth, role: role.name },
+      });
       return null;
     }
   }

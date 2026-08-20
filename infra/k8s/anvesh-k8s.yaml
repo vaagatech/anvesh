@@ -1,0 +1,688 @@
+# =========================================================================
+# Anvesh Microservices Platform for K3s (OCI)
+# Includes: Engine, Spider, Indexer, Hub, Redis Queues, Shared PVC, HPA (75%)
+# Lightweight & Cloud-Native (Resource-guarded, sub-100MB RAM/pod)
+# =========================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: anvesh
+  labels:
+    app.kubernetes.io/part-of: anvesh
+    app.kubernetes.io/vendor: vaagatech
+---
+# Shared Persistent Volume Claim for document corpora, crawl dumps, & index shards
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: anvesh-shared-data-pvc
+  namespace: anvesh
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+# 1. Anvesh Redis Deployment (Distributed Queue, Task Buffer & Pub/Sub)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: anvesh-redis
+  namespace: anvesh
+  labels:
+    app.kubernetes.io/name: anvesh-redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: anvesh-redis
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: anvesh-redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          command: ["redis-server", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru", "--save", ""]
+          ports:
+            - name: redis
+              containerPort: 6379
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+          livenessProbe:
+            tcpSocket:
+              port: 6379
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: 6379
+            initialDelaySeconds: 2
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: anvesh-redis
+  namespace: anvesh
+  labels:
+    app.kubernetes.io/name: anvesh-redis
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: anvesh-redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+---
+# Common Configuration across Anvesh microservices
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: anvesh-config
+  namespace: anvesh
+data:
+  ANVESH_STORAGE: "tiered"
+  ANVESH_DATA_DIR: "/data/engine"
+  ANVESH_SPIDER_DATA_DIR: "/data/spider"
+  ANVESH_INDEXER_DATA_DIR: "/data/indexer"
+  ANVESH_HUB_DATA: "/data/hub"
+  REDIS_URL: "redis://anvesh-redis:6379"
+  ANVESH_S3_BUCKET: "anvesh-indexes-v8tam2"
+  ANVESH_S3_ENDPOINT: "https://axkdaujrafzw.compat.objectstorage.ap-hyderabad-1.oraclecloud.com"
+  ANVESH_S3_REGION: "us-east-1"
+  ANVESH_S3_PREFIX: "anvesh/indexes/"
+  ANVESH_PORT: "3848"
+  ANVESH_HUB_PORT: "3849"
+  ANVESH_SPIDER_PORT: "3851"
+  ANVESH_INDEXER_PORT: "3852"
+  ANVESH_HOST: "0.0.0.0"
+  ANVESH_LOG_PRETTY: "0"
+  ANVESH_CORS_ORIGIN: "*"
+  ANVESH_RATE_LIMIT: "120"
+  ANVESH_HUB_ADMIN_USER: "admin"
+  ANVESH_ENGINE_BASE_URL: "http://anvesh-engine-service:3848"
+  ANVESH_SPIDER_BASE_URL: "http://anvesh-spider-service:3851"
+  ANVESH_INDEXER_BASE_URL: "http://anvesh-indexer-service:3852"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: anvesh-secrets
+  namespace: anvesh
+type: Opaque
+stringData:
+  ANVESH_API_KEY: "anvesh-k3s-secret-key"
+  ANVESH_SPIDER_API_KEY: "anvesh-k3s-secret-key"
+  ANVESH_INDEXER_API_KEY: "anvesh-k3s-secret-key"
+  ANVESH_HUB_ADMIN_PASSWORD: "anveshPassword"
+  AWS_ACCESS_KEY_ID: "f2b26cd63c9ca87fd8baf135dae17aeca4c18d22"
+  AWS_SECRET_ACCESS_KEY: "Ey3DP/TKvlNMuXXd9bBmOdSiu+8PuQI8rS63kkQuQdY="
+---
+# 2. Anvesh Engine Microservice (Querying & Real-time Search on Port 3848)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: anvesh-engine
+  namespace: anvesh
+  labels:
+    app.kubernetes.io/name: anvesh-engine
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: anvesh-engine
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: anvesh-engine
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: anvesh-engine
+          image: anvesh:0.1.0
+          imagePullPolicy: Never
+          command: ["node", "apps/engine/dist/cli.js", "serve"]
+          ports:
+            - name: http
+              containerPort: 3848
+          envFrom:
+            - configMapRef:
+                name: anvesh-config
+            - secretRef:
+                name: anvesh-secrets
+          volumeMounts:
+            - name: shared-data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3848
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3848
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: shared-data
+          persistentVolumeClaim:
+            claimName: anvesh-shared-data-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: anvesh-engine-service
+  namespace: anvesh
+  labels:
+    app.kubernetes.io/name: anvesh-engine
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: anvesh-engine
+  ports:
+    - name: http
+      port: 3848
+      targetPort: 3848
+---
+# 3. Anvesh Spider Microservice (Distributed Web Crawler Worker on Port 3851)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: anvesh-spider
+  namespace: anvesh
+  labels:
+    app.kubernetes.io/name: anvesh-spider
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: anvesh-spider
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: anvesh-spider
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: anvesh-spider
+          image: anvesh:0.1.0
+          imagePullPolicy: Never
+          command: ["node", "apps/spider/dist/cli.js", "serve"]
+          ports:
+            - name: http
+              containerPort: 3851
+          envFrom:
+            - configMapRef:
+                name: anvesh-config
+            - secretRef:
+                name: anvesh-secrets
+          volumeMounts:
+            - name: shared-data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3851
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3851
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: shared-data
+          persistentVolumeClaim:
+            claimName: anvesh-shared-data-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: anvesh-spider-service
+  namespace: anvesh
+  labels:
+    app.kubernetes.io/name: anvesh-spider
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: anvesh-spider
+  ports:
+    - name: http
+      port: 3851
+      targetPort: 3851
+---
+# 4. Anvesh Indexer Microservice (Bulk Ingestion & Pipeline on Port 3852)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: anvesh-indexer
+  namespace: anvesh
+  labels:
+    app.kubernetes.io/name: anvesh-indexer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: anvesh-indexer
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: anvesh-indexer
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: anvesh-indexer
+          image: anvesh:0.1.0
+          imagePullPolicy: Never
+          command: ["node", "apps/indexer/dist/cli.js", "serve"]
+          ports:
+            - name: http
+              containerPort: 3852
+          envFrom:
+            - configMapRef:
+                name: anvesh-config
+            - secretRef:
+                name: anvesh-secrets
+          volumeMounts:
+            - name: shared-data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3852
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3852
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: shared-data
+          persistentVolumeClaim:
+            claimName: anvesh-shared-data-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: anvesh-indexer-service
+  namespace: anvesh
+  labels:
+    app.kubernetes.io/name: anvesh-indexer
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: anvesh-indexer
+  ports:
+    - name: http
+      port: 3852
+      targetPort: 3852
+---
+# 5. Anvesh Hub Control Plane & Service Registry Microservice (Port 3849)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: anvesh-hub
+  namespace: anvesh
+  labels:
+    app.kubernetes.io/name: anvesh-hub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: anvesh-hub
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: anvesh-hub
+    spec:
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: anvesh-hub
+          image: anvesh:0.1.0
+          imagePullPolicy: Never
+          command: ["node", "apps/hub-api/dist/cli.js", "serve"]
+          ports:
+            - name: http
+              containerPort: 3849
+          envFrom:
+            - configMapRef:
+                name: anvesh-config
+            - secretRef:
+                name: anvesh-secrets
+          volumeMounts:
+            - name: shared-data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /hub/health
+              port: 3849
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /hub/health
+              port: 3849
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: shared-data
+          persistentVolumeClaim:
+            claimName: anvesh-shared-data-pvc
+---
+# Traefik StripPrefix Middleware: strips "/anvesh" so Hub receives "/hub/..." and Engine receives native endpoints
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: anvesh-strip-prefix
+  namespace: anvesh
+spec:
+  stripPrefix:
+    prefixes:
+      - /anvesh
+---
+# Ingress routing /anvesh/hub to Hub, /anvesh/spider to Spider, /anvesh/indexer to Indexer, /anvesh to Engine
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: anvesh-ingress
+  namespace: anvesh
+  annotations:
+    ingress.kubernetes.io/ssl-redirect: "false"
+    traefik.ingress.kubernetes.io/router.middlewares: anvesh-anvesh-strip-prefix@kubernetescrd
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /anvesh/hub
+            pathType: Prefix
+            backend:
+              service:
+                name: anvesh-hub-service
+                port:
+                  number: 3849
+          - path: /anvesh/spider
+            pathType: Prefix
+            backend:
+              service:
+                name: anvesh-spider-service
+                port:
+                  number: 3851
+          - path: /anvesh/indexer
+            pathType: Prefix
+            backend:
+              service:
+                name: anvesh-indexer-service
+                port:
+                  number: 3852
+          - path: /anvesh
+            pathType: Prefix
+            backend:
+              service:
+                name: anvesh-engine-service
+                port:
+                  number: 3848
+---
+# =========================================================================
+# Horizontal Pod Autoscalers (75% Target Threshold for ALL Microservices)
+# =========================================================================
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: anvesh-engine-hpa
+  namespace: anvesh
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: anvesh-engine
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: anvesh-hub-hpa
+  namespace: anvesh
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: anvesh-hub
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: anvesh-spider-hpa
+  namespace: anvesh
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: anvesh-spider
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: anvesh-indexer-hpa
+  namespace: anvesh
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: anvesh-indexer
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75
+---
+# =========================================================================
+# Prometheus Monitoring Pod & Telemetry Scrapers (Engine, Spider, Indexer, Hub)
+# =========================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: anvesh
+  labels:
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/part-of: anvesh
+    app.kubernetes.io/vendor: vaagatech
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 10s
+      evaluation_interval: 10s
+
+    scrape_configs:
+      - job_name: "anvesh-engine"
+        static_configs:
+          - targets: ["anvesh-engine:3848"]
+        metrics_path: /metrics
+        scrape_timeout: 5s
+
+      - job_name: "anvesh-spider"
+        static_configs:
+          - targets: ["anvesh-spider:3851"]
+        metrics_path: /metrics
+        scrape_timeout: 5s
+
+      - job_name: "anvesh-indexer"
+        static_configs:
+          - targets: ["anvesh-indexer:3852"]
+        metrics_path: /metrics
+        scrape_timeout: 5s
+
+      - job_name: "anvesh-hub"
+        static_configs:
+          - targets: ["anvesh-hub:3849"]
+        metrics_path: /hub/metrics
+        scrape_timeout: 5s
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: anvesh
+  labels:
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/part-of: anvesh
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: prometheus
+    spec:
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v2.54.1
+          args:
+            - "--config.file=/etc/prometheus/prometheus.yml"
+            - "--storage.tsdb.path=/prometheus"
+            - "--web.enable-lifecycle"
+          ports:
+            - name: web
+              containerPort: 9090
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /-/healthy
+              port: web
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: web
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus
+            - name: storage
+              mountPath: /prometheus
+      volumes:
+        - name: config
+          configMap:
+            name: prometheus-config
+        - name: storage
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: anvesh
+  labels:
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/part-of: anvesh
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: prometheus
+  ports:
+    - name: web
+      port: 9090
+      targetPort: web
+

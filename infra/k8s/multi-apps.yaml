@@ -1,0 +1,194 @@
+# ==========================================
+# Application 1: Orders Microservice (/orders)
+# ==========================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: orders-service-deployment
+  namespace: default
+  labels:
+    app: orders-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: orders-service
+  template:
+    metadata:
+      labels:
+        app: orders-service
+    spec:
+      containers:
+      - name: orders-api
+        image: hashicorp/http-echo:latest
+        args:
+        - "-text={\"service\":\"orders-service\",\"version\":\"1.0.0\",\"status\":\"OK\",\"cluster\":\"oci-k3s\"}"
+        - "-listen=:8080"
+        ports:
+        - containerPort: 8080
+        resources:
+          requests:
+            cpu: "25m"
+            memory: "32Mi"
+          limits:
+            cpu: "100m"
+            memory: "64Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orders-service
+  namespace: default
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: orders-service
+---
+# ==========================================
+# Application 2: Users Microservice (/users)
+# ==========================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: users-service-deployment
+  namespace: default
+  labels:
+    app: users-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: users-service
+  template:
+    metadata:
+      labels:
+        app: users-service
+    spec:
+      containers:
+      - name: users-api
+        image: hashicorp/http-echo:latest
+        args:
+        - "-text={\"service\":\"users-service\",\"version\":\"1.0.0\",\"status\":\"OK\",\"cluster\":\"oci-k3s\"}"
+        - "-listen=:8080"
+        ports:
+        - containerPort: 8080
+        resources:
+          requests:
+            cpu: "25m"
+            memory: "32Mi"
+          limits:
+            cpu: "100m"
+            memory: "64Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: users-service
+  namespace: default
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: users-service
+---
+# ==========================================
+# Application 3: Demo Web / Health (/demo & /)
+# ==========================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-web-deployment
+  namespace: default
+  labels:
+    app: demo-web
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: demo-web
+  template:
+    metadata:
+      labels:
+        app: demo-web
+    spec:
+      containers:
+      - name: web-server
+        image: nginxdemos/hello:latest
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: "25m"
+            memory: "32Mi"
+          limits:
+            cpu: "100m"
+            memory: "64Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-web-service
+  namespace: default
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 80
+  selector:
+    app: demo-web
+---
+# =========================================================================
+# Unified Ingress: Multi-Application Path-Based Routing via Traefik
+# =========================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: unified-k3s-multi-app-ingress
+  namespace: default
+  annotations:
+    ingress.kubernetes.io/ssl-redirect: "false"
+    traefik.ingress.kubernetes.io/router.middlewares: default-verify-origin-middleware@kubernetescrd
+spec:
+  rules:
+  - http:
+      paths:
+      # Route 1: Orders Microservice
+      - path: /orders
+        pathType: Prefix
+        backend:
+          service:
+            name: orders-service
+            port:
+              number: 80
+
+      # Route 2: Users Microservice
+      - path: /users
+        pathType: Prefix
+        backend:
+          service:
+            name: users-service
+            port:
+              number: 80
+
+      # Route 3: Demo Web App
+      - path: /demo
+        pathType: Prefix
+        backend:
+          service:
+            name: demo-web-service
+            port:
+              number: 80
+
+      # Route 4: Root / Catch-all Fallback
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: demo-web-service
+            port:
+              number: 80

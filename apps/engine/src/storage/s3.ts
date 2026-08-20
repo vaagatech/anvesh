@@ -19,7 +19,7 @@ export class S3Storage implements StorageAdapter {
   constructor(private readonly options: S3StorageOptions) {
     this.prefix = (options.prefix ?? "anvesh/indexes/").replace(/\/?$/, "/");
     this.client = new S3Client({
-      region: options.region ?? process.env.AWS_REGION ?? "us-east-1",
+      region: options.region ?? process.env.ANVESH_S3_REGION ?? process.env.AWS_REGION ?? "us-east-1",
       ...(options.endpoint
         ? { endpoint: options.endpoint, forcePathStyle: options.forcePathStyle ?? true }
         : {}),

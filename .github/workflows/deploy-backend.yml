@@ -1,0 +1,62 @@
+name: Backend Deployment (K3s Microservices)
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "apps/engine/**"
+      - "apps/spider/**"
+      - "apps/indexer/**"
+      - "apps/hub-api/**"
+      - "packages/**"
+      - "infra/k8s/**"
+      - "Dockerfile"
+      - ".github/workflows/deploy-backend.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy-backend:
+    name: Build & Rollout to K3s Cluster
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: "npm"
+
+      - name: Install Dependencies & Verify Build
+        run: |
+          npm ci
+          npm run build -w @vaagatech/anvesh-shared -w @vaagatech/anvesh-plugins -w @vaagatech/vaakly -w @vaagatech/anvesh-search-adapters -w @vaagatech/anvesh-engine -w @vaagatech/anvesh-spider -w @vaagatech/anvesh-indexer -w @vaagatech/anvesh-hub-api
+
+      - name: Verify Required Secrets
+        run: |
+          if [ -z "${{ secrets.SSH_PRIVATE_KEY }}" ]; then
+            echo "::error::Secret SSH_PRIVATE_KEY is missing! Please configure it in Repository Secrets."
+            exit 1
+          fi
+          if [ -z "${{ secrets.K3S_HOST }}" ]; then
+            echo "::error::Secret K3S_HOST is missing! Please configure it in Repository Secrets."
+            exit 1
+          fi
+
+      - name: Setup SSH Key & Known Hosts
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.K3S_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Sync Source to Master Node & Build Container
+        run: |
+          rsync -avz --delete --exclude "node_modules" --exclude ".git" --exclude ".turbo" --exclude "dist" -e "ssh -i ~/.ssh/id_rsa" ./ ubuntu@${{ secrets.K3S_HOST }}:~/searchengine/
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.K3S_HOST }} "cd ~/searchengine && sudo docker build -t anvesh:0.1.0 . && sudo docker save anvesh:0.1.0 | sudo k3s ctr images import -"
+
+      - name: Apply K8s Manifests & Rollout Restart
+        run: |
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.K3S_HOST }} "sudo kubectl apply -f ~/searchengine/infra/k8s/anvesh-k8s.yaml && sudo kubectl rollout restart deployment/anvesh-engine deployment/anvesh-spider deployment/anvesh-indexer deployment/anvesh-hub deployment/prometheus -n anvesh && sudo kubectl rollout status deployment/anvesh-engine -n anvesh --timeout=120s"

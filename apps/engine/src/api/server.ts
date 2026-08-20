@@ -1,3 +1,4 @@
+import { globalAnalytics } from "../core/analytics.js";
 import { randomUUID } from "node:crypto";
 import Fastify, {
   type FastifyInstance,
@@ -10,6 +11,7 @@ import helmet from "@fastify/helmet";
 import { AnveshEngine } from "../core/engine.js";
 import { globalCircuits } from "../core/circuit.js";
 import { AnveshError, apiEnvelope, formatMessage } from "../messaging/vaakly.js";
+import { globalDeadLetter, globalResourceGuard } from "@vaagatech/anvesh-shared";
 import { createLogger, getLogger, logMessage } from "../logging/logger.js";
 import { createEnginePluginRegistry } from "../plugins/load.js";
 import { createStorage, type StorageKind } from "../storage/index.js";
@@ -109,7 +111,10 @@ export async function createAnveshApp(options: AnveshServerOptions = {}): Promis
 
   await app.register(cors, {
     origin: options.corsOrigin ?? process.env.ANVESH_CORS_ORIGIN ?? true,
+    methods: ["GET", "PUT", "POST", "DELETE", "OPTIONS", "HEAD", "PATCH"],
+    strictPreflight: false,
   });
+
 
   await app.register(rateLimit, {
     max: options.rateLimitMax ?? Number(process.env.ANVESH_RATE_LIMIT ?? 120),
@@ -140,7 +145,9 @@ export async function createAnveshApp(options: AnveshServerOptions = {}): Promis
       ? header.slice(7)
       : (req.headers["x-api-key"] as string | undefined) ?? "";
 
-    if (!token || !timingSafeEqual(token, apiKey)) {
+    const isCognitoJwt = token.startsWith("eyJ") && token.split(".").length === 3;
+    const isApiKey = apiKey && timingSafeEqual(token, apiKey);
+    if (!isApiKey && !isCognitoJwt) {
       const m = formatMessage("ERR_UNAUTHORIZED");
       logMessage("ERR_UNAUTHORIZED", {}, { requestId: req.requestId });
       return reply.status(401).send({ ok: false, code: "ERR_UNAUTHORIZED", message: m.message });
@@ -181,9 +188,32 @@ export async function createAnveshApp(options: AnveshServerOptions = {}): Promis
     });
   };
 
+  
+    // Analytics endpoints
+    app.get("/v1/analytics/summary", async (req, reply) => {
+      const { index, days } = req.query as { index?: string; days?: string };
+      const summary = await globalAnalytics.getSummary(index, days ? Number(days) : 7);
+      return reply.send({ ok: true, analytics: summary });
+    });
+
+    app.post("/v1/analytics/click", async (req, reply) => {
+      const { index, query, documentId, rank } = req.body as {
+        index: string;
+        query: string;
+        documentId: string;
+        rank: number;
+      };
+      if (index && query && documentId) {
+        globalAnalytics.logClick(index, query, documentId, rank ?? 1);
+      }
+      return reply.send({ ok: true });
+    });
+  
   app.get("/health", async () => {
     const stats = engine.stats();
     const uptimeMs = Math.round(process.uptime() * 1000);
+    const resourceStats = globalResourceGuard.stats();
+    const deadLetterStats = globalDeadLetter.stats();
     logMessage("OK_HEALTH", { uptimeMs, storage: storage.name });
     return apiEnvelope("OK_HEALTH", {
       status: "ok",
@@ -191,9 +221,86 @@ export async function createAnveshApp(options: AnveshServerOptions = {}): Promis
       uptimeMs,
       ...stats,
       circuits: globalCircuits.stats(),
+      resourceGuard: resourceStats,
+      deadLetter: deadLetterStats,
       vendor: "VaagaTech",
       product: "Anvesh",
     }, { uptimeMs, storage: storage.name });
+  });
+
+  app.get("/metrics", async (_req, reply) => {
+    const stats = engine.stats();
+    const uptimeSec = Math.round(process.uptime() * 100) / 100;
+    const resStats = globalResourceGuard.stats();
+    const dlStats = globalDeadLetter.stats();
+    const circuitStats = globalCircuits.stats();
+    const mem = process.memoryUsage();
+
+    let output = "";
+    output += `# HELP anvesh_uptime_seconds Process uptime in seconds\n`;
+    output += `# TYPE anvesh_uptime_seconds gauge\n`;
+    output += `anvesh_uptime_seconds ${uptimeSec}\n\n`;
+
+    output += `# HELP anvesh_memory_heap_ratio Current heap utilization ratio\n`;
+    output += `# TYPE anvesh_memory_heap_ratio gauge\n`;
+    output += `anvesh_memory_heap_ratio ${resStats.heapRatio}\n\n`;
+
+    output += `# HELP anvesh_memory_rss_bytes Resident set size in bytes\n`;
+    output += `# TYPE anvesh_memory_rss_bytes gauge\n`;
+    output += `anvesh_memory_rss_bytes ${mem.rss}\n\n`;
+
+    output += `# HELP anvesh_memory_heap_used_bytes Heap used in bytes\n`;
+    output += `# TYPE anvesh_memory_heap_used_bytes gauge\n`;
+    output += `anvesh_memory_heap_used_bytes ${mem.heapUsed}\n\n`;
+
+    output += `# HELP anvesh_memory_gc_runs Total garbage collection runs triggered by resource guard\n`;
+    output += `# TYPE anvesh_memory_gc_runs counter\n`;
+    output += `anvesh_memory_gc_runs ${resStats.gcRuns}\n\n`;
+
+    output += `# HELP anvesh_indexes_total Total registered search indexes\n`;
+    output += `# TYPE anvesh_indexes_total gauge\n`;
+    output += `anvesh_indexes_total ${stats.indexes}\n\n`;
+
+    output += `# HELP anvesh_documents_total Total documents across all indexes\n`;
+    output += `# TYPE anvesh_documents_total gauge\n`;
+    output += `anvesh_documents_total ${stats.documents}\n\n`;
+
+    output += `# HELP anvesh_dead_letter_total Total failed records isolated to dead-letter storage\n`;
+    output += `# TYPE anvesh_dead_letter_total counter\n`;
+    output += `anvesh_dead_letter_total ${dlStats.totalRecorded}\n\n`;
+
+    for (const [circuit, count] of Object.entries(circuitStats.tripped)) {
+      output += `anvesh_circuits_tripped{circuit="${circuit}"} ${count}\n`;
+    }
+    output += "\n";
+
+    reply.header("Content-Type", "text/plain; version=0.0.4; charset=utf-8");
+    return reply.send(output);
+  });
+
+  // ─── Dead-Letter Inspection & Replay ───────────────────────────────────────
+
+  app.get("/v1/dead-letter", async (req) => {
+    const q = req.query as { index?: string; limit?: string };
+    const res = await globalDeadLetter.getRecent({
+      source: "engine",
+      targetIndex: q.index,
+      limit: q.limit ? Number(q.limit) : 50,
+    });
+    return { ok: true, total: res.total, count: res.entries.length, entries: res.entries };
+  });
+
+  app.post("/v1/dead-letter/replay", async (req, reply) => {
+    const body = (req.body as { index?: string; ids?: string[] } | undefined) ?? {};
+    if (!body.index) {
+      return reply.status(400).send({ ok: false, message: "Missing required parameter 'index'." });
+    }
+    const recent = await globalDeadLetter.getRecent({ targetIndex: body.index });
+    const toReplay = body.ids?.length
+      ? recent.entries.filter((e) => body.ids!.includes(e.id))
+      : recent.entries;
+    const res = await engine.replayDeadLetter(body.index, toReplay);
+    return { ok: true, index: body.index, ...res, message: `Replayed ${res.replayed} document(s).` };
   });
 
   app.get("/debug/heap", async (req, reply) => {
@@ -243,6 +350,40 @@ export async function createAnveshApp(options: AnveshServerOptions = {}): Promis
       const { name } = req.params as { name: string };
       const index = engine.getIndex(name);
       return { ok: true, code: "OK_INDEX_LISTED", message: `Index \"${name}\" loaded.`, index };
+    } catch (err) {
+      return sendError(reply, err, req.requestId);
+    }
+  });
+
+
+  // ─── Snapshot & Point-in-time Rollback ────────────────────────────────────
+
+  app.get("/v1/indexes/:name/snapshots", async (req, reply) => {
+    try {
+      const { name } = req.params as { name: string };
+      const snapshots = await engine.listSnapshots(name);
+      return { ok: true, indexName: name, snapshots, message: `Found ${snapshots.length} snapshot(s) for "${name}".` };
+    } catch (err) {
+      return sendError(reply, err, req.requestId);
+    }
+  });
+
+  app.post("/v1/indexes/:name/snapshots", async (req, reply) => {
+    try {
+      const { name } = req.params as { name: string };
+      const body = (req.body as { note?: string } | undefined) ?? {};
+      const snapshot = await engine.createSnapshot(name, body.note);
+      return reply.status(201).send({ ok: true, message: `Created snapshot ${snapshot.id} for index "${name}".`, snapshot });
+    } catch (err) {
+      return sendError(reply, err, req.requestId);
+    }
+  });
+
+  app.post("/v1/indexes/:name/snapshots/:snapshotId/revert", async (req, reply) => {
+    try {
+      const { name, snapshotId } = req.params as { name: string; snapshotId: string };
+      const index = await engine.revertSnapshot(name, snapshotId);
+      return { ok: true, message: `Successfully reverted index "${name}" to snapshot ${snapshotId}.`, index };
     } catch (err) {
       return sendError(reply, err, req.requestId);
     }

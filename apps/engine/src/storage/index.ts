@@ -1,3 +1,4 @@
+import { TieredStorage } from "./tiered.js";
 import { MemoryStorage } from "./memory.js";
 import { FilesystemStorage } from "./filesystem.js";
 import { DfsStorage } from "./dfs.js";
@@ -18,6 +19,21 @@ export function createStorage(options: StorageFactoryOptions): StorageAdapter {
       return new DfsStorage({
         path: options.path ?? process.env.ANVESH_DFS_PATH ?? ".anvesh/dfs",
         blockSizeMb: options.blockSizeMb,
+      });
+    case "tiered":
+    case "oci":
+      if (!options.bucket && !process.env.ANVESH_S3_BUCKET) {
+        throw new AnveshError("ERR_VALIDATION", { detail: "Tiered/OCI storage requires bucket" });
+      }
+      return new TieredStorage({
+        localDir: options.path ?? process.env.ANVESH_DATA_DIR ?? ".anvesh/data",
+        cloud: {
+          bucket: options.bucket ?? process.env.ANVESH_S3_BUCKET!,
+          prefix: options.prefix ?? process.env.ANVESH_S3_PREFIX ?? "anvesh/indexes/",
+          region: options.region ?? process.env.ANVESH_S3_REGION ?? "us-east-1",
+          endpoint: options.endpoint ?? process.env.ANVESH_S3_ENDPOINT,
+          forcePathStyle: true,
+        },
       });
     case "s3":
       if (!options.bucket && !process.env.ANVESH_S3_BUCKET) {
@@ -64,3 +80,4 @@ export * from "./s3.js";
 export * from "./redis.js";
 export * from "./dynamodb.js";
 export * from "./mongodb.js";
+export * from "./tiered.js";

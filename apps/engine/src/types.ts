@@ -140,6 +140,26 @@ export interface GeoQuery {
   sortByDistance?: boolean;
 }
 
+
+export interface BoostFilter {
+  field: string;
+  equals?: string | number | boolean;
+  notEquals?: string | number | boolean;
+  in?: Array<string | number | boolean>;
+  gt?: number;
+  gte?: number;
+  lt?: number;
+  lte?: number;
+  exists?: boolean;
+}
+
+export interface BoostRule {
+  filter: BoostFilter;
+  /** Multiplier (e.g. 5 for 5x, 0.5 for 0.5x) or additive weight */
+  weight: number;
+  mode?: "multiply" | "add";
+}
+
 export interface SearchQuery {
   /** Full-text query string. */
   q?: string;
@@ -174,6 +194,10 @@ export interface SearchQuery {
   prefix?: boolean;
   /** Per-field score multipliers. */
   boosts?: Record<string, number>;
+  /** Conditional weightage scoring rules (e.g. category === "featured" -> 5x). */
+  boostRules?: BoostRule[];
+  /** ElasticSearch-compatible function_score alias. */
+  functions?: BoostRule[];
   /** Cursor for deep pagination (document id). */
   searchAfter?: string;
   /** Bool subset */
@@ -219,5 +243,6 @@ export interface BulkIndexResult {
   indexed: number;
   failed: number;
   errors: Array<{ id?: string; message: string }>;
+  deadLetterCount?: number;
   message: string;
 }

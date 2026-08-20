@@ -68,12 +68,35 @@ export class CircuitBreakers {
   }
 
   checkMemory(): void {
-    if (!this.limits.maxRssMb) return;
-    const rssMb = process.memoryUsage().rss / (1024 * 1024);
-    if (rssMb > this.limits.maxRssMb) {
+    const mem = process.memoryUsage();
+    const heapUsedMb = mem.heapUsed / (1024 * 1024);
+    const heapTotalMb = mem.heapTotal / (1024 * 1024);
+    const rssMb = mem.rss / (1024 * 1024);
+
+    // 1. Check Heap Utilization Guard (75% warning / 85% backpressure)
+    const heapRatio = heapUsedMb / Math.max(heapTotalMb, 64);
+    if (heapRatio > 0.85) {
+      if (typeof (global as any).gc === "function") {
+        try { (global as any).gc(); } catch (_) {}
+      }
       this.tripped.memory! += 1;
       const err = new Error(
-        `Memory circuit open (RSS ${Math.round(rssMb)}MB > ${this.limits.maxRssMb}MB). Retry later.`,
+        `Resource guard active: Heap utilization at ${Math.round(heapRatio * 100)}% (> 85%). Applying backpressure.`
+      );
+      (err as Error & { code: string; httpStatus: number }).code = "ERR_CIRCUIT_MEMORY";
+      (err as Error & { httpStatus: number }).httpStatus = 429;
+      throw err;
+    } else if (heapRatio > 0.75) {
+      if (typeof (global as any).gc === "function") {
+        try { (global as any).gc(); } catch (_) {}
+      }
+    }
+
+    // 2. Check Absolute RSS limit if configured
+    if (this.limits.maxRssMb && rssMb > this.limits.maxRssMb) {
+      this.tripped.memory! += 1;
+      const err = new Error(
+        `Memory circuit open (RSS ${Math.round(rssMb)}MB > ${this.limits.maxRssMb}MB). Retry later.`
       );
       (err as Error & { code: string; httpStatus: number }).code = "ERR_CIRCUIT_MEMORY";
       (err as Error & { httpStatus: number }).httpStatus = 429;

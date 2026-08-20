@@ -1,0 +1,15 @@
+tenancy_ocid     = "ocid1.tenancy.oc1..your_tenancy_ocid"
+user_ocid        = "ocid1.user.oc1..your_user_ocid"
+fingerprint      = "your_api_fingerprint"
+private_key_path = "~/.oci/oci_api_key.pem"
+region           = "ap-hyderabad-1"
+
+ssh_public_key       = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQ... user@host"
+ssh_private_key_path = "~/.ssh/id_rsa"
+
+domain_name = "vaagatech.com"
+
+# AWS Access Credentials (if managing Route 53 or S3 backend)
+aws_access_key = "YOUR_AWS_ACCESS_KEY"
+aws_secret_key = "YOUR_AWS_SECRET_KEY"
+aws_region     = "us-east-1"

@@ -18,3 +18,13 @@ tmp/
 reports/
 *.iml
 /.turbo/
+
+# Terraform & Secrets
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+.terraform/
+.terraform.lock.hcl
+*.pem
+

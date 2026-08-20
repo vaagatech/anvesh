@@ -1,3 +1,4 @@
+import { globalAnalytics } from "./analytics.js";
 /**
  * Anvesh Engine — orchestrates inverted index + vector store per named index.
  */
@@ -14,8 +15,10 @@ import {
   expandMappingsFromFields,
 } from "./dynamic-mapping.js";
 import { AnveshError, formatMessage } from "../messaging/vaakly.js";
+import { globalDeadLetter, globalResourceGuard, type DeadLetterEntry } from "@vaagatech/anvesh-shared";
 import type { StorageAdapter } from "../storage/types.js";
 import type {
+  BoostRule,
   AnveshDocument,
   BulkIndexItem,
   BulkIndexResult,
@@ -25,6 +28,7 @@ import type {
   IndexSettings,
   SearchQuery,
   SearchResult,
+  SearchHit,
   JsonValue,
 } from "../types.js";
 
@@ -38,6 +42,42 @@ export interface PersistedIndex {
   definition: IndexDefinition;
   inverted: InvertedIndexSnapshot;
   vectors: VectorStoreSnapshot | null;
+}
+
+
+function evaluateBoostRule(doc: AnveshDocument, rule: BoostRule): boolean {
+  const { field, equals, notEquals, in: inList, gt, gte, lt, lte, exists } = rule.filter;
+  const val = doc.fields[field];
+  if (exists !== undefined) {
+    const hasField = val !== undefined && val !== null;
+    if (hasField !== exists) return false;
+  }
+  if (equals !== undefined && val !== equals) return false;
+  if (notEquals !== undefined && val === notEquals) return false;
+  if (inList !== undefined && !inList.includes(val as any)) return false;
+  if (gt !== undefined && (typeof val !== "number" || val <= gt)) return false;
+  if (gte !== undefined && (typeof val !== "number" || val < gte)) return false;
+  if (lt !== undefined && (typeof val !== "number" || val >= lt)) return false;
+  if (lte !== undefined && (typeof val !== "number" || val > lte)) return false;
+  return true;
+}
+
+function applyBoostRules(hits: SearchHit[], rules?: BoostRule[]): SearchHit[] {
+  if (!rules?.length) return hits;
+  for (const hit of hits) {
+    for (const rule of rules) {
+      if (evaluateBoostRule(hit.source, rule)) {
+        const mode = rule.mode ?? "multiply";
+        if (mode === "multiply") {
+          hit.score = hit.score * rule.weight;
+        } else if (mode === "add") {
+          hit.score = hit.score + rule.weight;
+        }
+      }
+    }
+    hit.score = Math.round(hit.score * 1000) / 1000;
+  }
+  return hits.sort((a, b) => b.score - a.score);
 }
 
 export class AnveshEngine {
@@ -322,30 +362,41 @@ export class AnveshEngine {
       meta?: Record<string, JsonValue>;
     },
   ): Promise<AnveshDocument> {
-    const state = await this.ensureIndexState(indexName);
-    const id = input.id ?? randomUUID();
-    const fields = this.prepareFields(state, input.fields);
-    let vector = input.vector;
-    if (!vector && this.shouldAutoEmbed(state.definition.settings)) {
-      const dims = state.definition.settings!.vectorDimensions!;
-      vector = localEmbed(textFromFields(fields), dims);
+    try {
+      const state = await this.ensureIndexState(indexName);
+      const id = input.id ?? randomUUID();
+      const fields = this.prepareFields(state, input.fields);
+      let vector = input.vector;
+      if (!vector && this.shouldAutoEmbed(state.definition.settings)) {
+        const dims = state.definition.settings!.vectorDimensions!;
+        vector = localEmbed(textFromFields(fields), dims);
+      }
+      const doc: AnveshDocument = {
+        id,
+        fields,
+        meta: input.meta,
+        updatedAt: new Date().toISOString(),
+      };
+      if (vector) {
+        this.ensureVectorStore(state).upsert(id, vector);
+        doc.vector = vector;
+      }
+      state.inverted.upsert(doc);
+      state.definition.docCount = state.inverted.docCount;
+      state.definition.updatedAt = doc.updatedAt!;
+      this.markDirty(indexName);
+      await this.flush(indexName);
+      return doc;
+    } catch (err) {
+      globalDeadLetter.record({
+        recordId: input.id,
+        source: "engine",
+        targetIndex: indexName,
+        error: err instanceof Error ? err : String(err),
+        payload: input,
+      });
+      throw err;
     }
-    const doc: AnveshDocument = {
-      id,
-      fields,
-      meta: input.meta,
-      updatedAt: new Date().toISOString(),
-    };
-    if (vector) {
-      this.ensureVectorStore(state).upsert(id, vector);
-      doc.vector = vector;
-    }
-    state.inverted.upsert(doc);
-    state.definition.docCount = state.inverted.docCount;
-    state.definition.updatedAt = doc.updatedAt!;
-    this.markDirty(indexName);
-    await this.flush(indexName);
-    return doc;
   }
 
   async bulkIndex(indexName: string, items: BulkIndexItem[]): Promise<BulkIndexResult> {
@@ -355,31 +406,59 @@ export class AnveshEngine {
     const auto = this.shouldAutoEmbed(state.definition.settings);
     const dims = state.definition.settings?.vectorDimensions;
 
-    for (const item of items) {
-      try {
-        const id = item.id ?? randomUUID();
-        const fields = this.prepareFields(state, item.fields);
-        let vector = item.vector;
-        if (!vector && auto && dims) {
-          vector = localEmbed(textFromFields(fields), dims);
+    // 1. Calculate adaptive chunk size to keep memory strictly <= 75%
+    const sampleBytes = items.length ? Math.min(JSON.stringify(items[0]).length, 1024 * 1024) : 2048;
+    const baseBatch = 100;
+    const adaptiveChunkSize = globalResourceGuard.calculateAdaptiveChunkSize(
+      items.length,
+      sampleBytes,
+      baseBatch,
+    );
+
+    // 2. Process in adaptive chunks with throttled backpressure
+    for (let c = 0; c < items.length; c += adaptiveChunkSize) {
+      await globalResourceGuard.throttleIfNeeded("engine.bulkIndex");
+      const chunk = items.slice(c, c + adaptiveChunkSize);
+
+      for (const item of chunk) {
+        if (indexed > 0 && indexed % 10 === 0) {
+          await globalResourceGuard.paceInFlight();
         }
-        const doc: AnveshDocument = {
-          id,
-          fields,
-          meta: item.meta,
-          updatedAt: new Date().toISOString(),
-        };
-        if (vector) {
-          this.ensureVectorStore(state).upsert(id, vector);
-          doc.vector = vector;
+        try {
+          const id = item.id ?? randomUUID();
+          const fields = this.prepareFields(state, item.fields);
+          let vector = item.vector;
+          if (!vector && auto && dims) {
+            vector = localEmbed(textFromFields(fields), dims);
+          }
+          const doc: AnveshDocument = {
+            id,
+            fields,
+            meta: item.meta,
+            updatedAt: new Date().toISOString(),
+          };
+          if (vector) {
+            this.ensureVectorStore(state).upsert(id, vector);
+            doc.vector = vector;
+          }
+          state.inverted.upsert(doc);
+          indexed += 1;
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          errors.push({
+            id: item.id,
+            message: errMsg,
+          });
+
+          // Isolate failure to Dead-Letter storage for replay / debug without crashing batch
+          globalDeadLetter.record({
+            recordId: item.id,
+            source: "engine",
+            targetIndex: indexName,
+            error: err instanceof Error ? err : errMsg,
+            payload: item,
+          });
         }
-        state.inverted.upsert(doc);
-        indexed += 1;
-      } catch (err) {
-        errors.push({
-          id: item.id,
-          message: err instanceof Error ? err.message : String(err),
-        });
       }
     }
 
@@ -390,7 +469,40 @@ export class AnveshEngine {
 
     const failed = errors.length;
     const msg = formatMessage("OK_BULK", { indexed, failed, index: indexName });
-    return { indexed, failed, errors, message: msg.message };
+    return { indexed, failed, errors, deadLetterCount: failed, message: msg.message };
+  }
+
+  /**
+   * Replay dead-letter entries for an index.
+   */
+  async replayDeadLetter(
+    indexName: string,
+    entries?: DeadLetterEntry[],
+  ): Promise<{ replayed: number; failed: number; errors: Array<{ id?: string; message: string }> }> {
+    const toReplay = entries ?? (await globalDeadLetter.getRecent({ targetIndex: indexName })).entries;
+    const items: BulkIndexItem[] = [];
+    for (const entry of toReplay) {
+      if (entry.payload && typeof entry.payload === "object") {
+        const p = entry.payload as Record<string, unknown>;
+        if (p.fields && typeof p.fields === "object") {
+          items.push({
+            id: (p.id as string | undefined) ?? entry.recordId,
+            fields: p.fields as Record<string, JsonValue>,
+            vector: p.vector as number[] | undefined,
+            meta: p.meta as Record<string, JsonValue> | undefined,
+          });
+        }
+      }
+    }
+    if (!items.length) {
+      return { replayed: 0, failed: 0, errors: [] };
+    }
+    const result = await this.bulkIndex(indexName, items);
+    return {
+      replayed: result.indexed,
+      failed: result.failed,
+      errors: result.errors,
+    };
   }
 
   async deleteDocument(indexName: string, id: DocumentId): Promise<void> {
@@ -647,6 +759,11 @@ export class AnveshEngine {
       hits = hits.map((h) => ({ ...h, source: this.publicDoc(h.source) }));
     }
 
+    const effectiveBoostRules = query.boostRules ?? query.functions;
+    if (effectiveBoostRules?.length) {
+      hits = applyBoostRules(hits, effectiveBoostRules);
+    }
+
     let facets: SearchResult["facets"];
     if (query.facets?.length) {
       facets = {};
@@ -701,7 +818,38 @@ export class AnveshEngine {
       idxMap.set(cacheKey, res);
     }
 
+    globalAnalytics.logQuery(indexName, query.q || "vector_query", mode, tookMs, hits.length);
     return res;
+  }
+
+  
+  async listSnapshots(name: string): Promise<any[]> {
+    const canonical = this.aliases.get(name) ?? name;
+    if ("listSnapshots" in this.storage && typeof (this.storage as any).listSnapshots === "function") {
+      return (this.storage as any).listSnapshots(canonical);
+    }
+    return [];
+  }
+
+  async createSnapshot(name: string, note?: string): Promise<any> {
+    const canonical = this.aliases.get(name) ?? name;
+    await this.flush(canonical);
+    if ("createSnapshot" in this.storage && typeof (this.storage as any).createSnapshot === "function") {
+      return (this.storage as any).createSnapshot(canonical, note);
+    }
+    throw new AnveshError("ERR_VALIDATION", { detail: "Current storage adapter does not support snapshot creation." });
+  }
+
+  async revertSnapshot(name: string, snapshotId: string): Promise<IndexDefinition> {
+    const canonical = this.aliases.get(name) ?? name;
+    if ("revertToSnapshot" in this.storage && typeof (this.storage as any).revertToSnapshot === "function") {
+      const persisted = await (this.storage as any).revertToSnapshot(canonical, snapshotId);
+      this.indexes.set(canonical, this.hydrate(persisted));
+      this.dirty.delete(canonical);
+      this.queryCache.delete(canonical);
+      return persisted.definition;
+    }
+    throw new AnveshError("ERR_VALIDATION", { detail: "Current storage adapter does not support snapshot reversion." });
   }
 
   stats(): { indexes: number; documents: number; dirty: number } {

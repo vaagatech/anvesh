@@ -14,7 +14,7 @@ export interface StorageAdapter {
   ping?(): Promise<boolean>;
 }
 
-export type StorageKind = "memory" | "filesystem" | "dfs" | "s3" | "redis" | "dynamodb" | "mongodb";
+export type StorageKind = "memory" | "filesystem" | "dfs" | "s3" | "oci" | "tiered" | "redis" | "dynamodb" | "mongodb";
 
 export interface StorageFactoryOptions {
   kind: StorageKind;

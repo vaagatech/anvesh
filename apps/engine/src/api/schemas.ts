@@ -61,6 +61,25 @@ const geoQuerySchema = z.object({
   sortByDistance: z.boolean().optional(),
 });
 
+
+export const boostFilterSchema = z.object({
+  field: z.string().min(1),
+  equals: z.union([z.string(), z.number(), z.boolean()]).optional(),
+  notEquals: z.union([z.string(), z.number(), z.boolean()]).optional(),
+  in: z.array(z.union([z.string(), z.number(), z.boolean()])).optional(),
+  gt: z.number().optional(),
+  gte: z.number().optional(),
+  lt: z.number().optional(),
+  lte: z.number().optional(),
+  exists: z.boolean().optional(),
+});
+
+export const boostRuleSchema = z.object({
+  filter: boostFilterSchema,
+  weight: z.number(),
+  mode: z.enum(["multiply", "add"]).default("multiply").optional(),
+});
+
 export const searchSchema = z.object({
   q: z.string().optional(),
   fields: z.array(z.string()).optional(),
@@ -94,6 +113,8 @@ export const searchSchema = z.object({
   phraseSlop: z.number().int().min(0).max(10).optional(),
   prefix: z.boolean().optional(),
   boosts: z.record(z.number()).optional(),
+  boostRules: z.array(boostRuleSchema).optional(),
+  functions: z.array(boostRuleSchema).optional(),
   searchAfter: z.string().optional(),
   must: z
     .array(z.object({ field: z.string(), value: z.union([z.string(), z.number(), z.boolean()]) }))

@@ -1,0 +1,17 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: verify-origin-middleware
+  namespace: default
+spec:
+  headers:
+    # Ensures backend apps receive sanitized proxy headers
+    customRequestHeaders:
+      X-Forwarded-Proto: "https"
+      X-Gateway-Verified: "true"
+    browserXssFilter: true
+    contentTypeNosniff: true
+    forceSTSHeader: true
+    stsIncludeSubdomains: true
+    stsPreload: true
+    stsSeconds: 31536000

@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Anvesh Search Engine & Vector DB — Architecture & Benchmark Guide</title>
+  <meta name="description" content="Ultra-lightweight, high-performance distributed search engine and vector database with sub-millisecond queries, OCI Object Storage persistence, and low-memory footprint.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #07090e;
+      --bg-secondary: #0d121d;
+      --bg-card: rgba(18, 24, 38, 0.7);
+      --bg-card-border: rgba(255, 255, 255, 0.08);
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --accent: #38bdf8;
+      --accent-gradient: linear-gradient(135deg, #38bdf8 0%, #818cf8 50%, #c084fc 100%);
+      --accent-glow: rgba(56, 189, 248, 0.15);
+      --success: #34d399;
+      --warning: #fbbf24;
+      --danger: #f87171;
+      --font-sans: "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: "JetBrains Mono", monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    /* Ambient Background Glow */
+    .glow-bg {
+      position: fixed;
+      top: -200px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 800px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(56, 189, 248, 0.12) 0%, rgba(129, 140, 248, 0.05) 50%, transparent 70%);
+      filter: blur(80px);
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Header / Nav */
+    header {
+      padding: 24px 0;
+      border-bottom: 1px solid var(--bg-card-border);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(7, 9, 14, 0.85);
+    }
+    .nav-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 800;
+      font-size: 1.25rem;
+      background: var(--accent-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-decoration: none;
+    }
+    .logo-badge {
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      color: var(--accent);
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      -webkit-text-fill-color: initial;
+    }
+    nav a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.9rem;
+      font-weight: 500;
+      margin-left: 24px;
+      transition: color 0.2s;
+    }
+    nav a:hover { color: var(--accent); }
+
+    /* Hero Section */
+    .hero {
+      padding: 80px 0 60px;
+      text-align: center;
+    }
+    .hero h1 {
+      font-size: 3.5rem;
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: 20px;
+      letter-spacing: -0.02em;
+    }
+    .hero h1 span {
+      background: var(--accent-gradient);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero p {
+      font-size: 1.25rem;
+      color: var(--text-secondary);
+      max-width: 780px;
+      margin: 0 auto 36px;
+    }
+    .hero-tags {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 48px;
+    }
+    .hero-tag {
+      background: var(--bg-secondary);
+      border: 1px solid var(--bg-card-border);
+      padding: 6px 16px;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    /* Grid Sections */
+    .section-title {
+      font-size: 2rem;
+      font-weight: 700;
+      margin: 60px 0 24px;
+      letter-spacing: -0.01em;
+    }
+    .section-subtitle {
+      color: var(--text-secondary);
+      margin-top: -16px;
+      margin-bottom: 32px;
+      font-size: 1rem;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 24px;
+      margin-bottom: 48px;
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--bg-card-border);
+      border-radius: 16px;
+      padding: 28px;
+      backdrop-filter: blur(16px);
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(56, 189, 248, 0.3);
+    }
+    .card-icon {
+      font-size: 2rem;
+      margin-bottom: 16px;
+    }
+    .card h3 {
+      font-size: 1.25rem;
+      margin-bottom: 10px;
+      font-weight: 700;
+    }
+    .card p {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      line-height: 1.6;
+    }
+
+    /* Architecture Diagram Box */
+    .arch-diagram {
+      background: var(--bg-secondary);
+      border: 1px solid var(--bg-card-border);
+      border-radius: 16px;
+      padding: 32px;
+      margin: 24px 0 48px;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      color: #38bdf8;
+      overflow-x: auto;
+      white-space: pre;
+      line-height: 1.5;
+    }
+
+    /* Benchmark Table */
+    .table-container {
+      background: var(--bg-card);
+      border: 1px solid var(--bg-card-border);
+      border-radius: 16px;
+      overflow: hidden;
+      margin: 24px 0 48px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+    th, td {
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--bg-card-border);
+      font-size: 0.95rem;
+    }
+    th {
+      background: rgba(255, 255, 255, 0.02);
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-size: 0.8rem;
+      letter-spacing: 0.05em;
+    }
+    tr:last-child td { border-bottom: none; }
+    .highlight-anvesh {
+      color: var(--success);
+      font-weight: 700;
+    }
+    .badge-win {
+      background: rgba(52, 211, 153, 0.1);
+      color: var(--success);
+      border: 1px solid rgba(52, 211, 153, 0.3);
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      margin-left: 6px;
+    }
+
+    /* Code Blocks */
+    pre {
+      background: #020617;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 20px;
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      color: #e2e8f0;
+      overflow-x: auto;
+      margin: 16px 0;
+    }
+    .code-tag {
+      color: #38bdf8;
+      font-weight: 600;
+    }
+
+    /* Footer */
+    footer {
+      border-top: 1px solid var(--bg-card-border);
+      padding: 40px 0;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-top: 80px;
+    }
+  </style>
+</head>
+<body>
+  <div class="glow-bg"></div>
+
+  <header>
+    <div class="container nav-inner">
+      <a href="#" class="logo">
+        ANVESH <span class="logo-badge">v0.4.0 CLOUD-NATIVE</span>
+      </a>
+      <nav>
+        <a href="#features">Features</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#benchmarks">Benchmarks</a>
+        <a href="#rag-semantic">NLP & RAG</a>
+        <a href="#scoring">Weightage Scoring</a>
+        <a href="#hpa">Autoscaling</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Hero -->
+    <section class="hero">
+      <h1>Ultra-Lightweight <span>Search & Vector DB</span></h1>
+      <p>High-precision BM25 + dense semantic retrieval, OCI Object Storage tiered persistence, distributed Redis queues, and sub-millisecond query execution without JVM memory overhead.</p>
+      <div class="hero-tags">
+        <span class="hero-tag">⚡ 46,000+ Search QPS</span>
+        <span class="hero-tag">🧠 Native Intent NLP & RAG</span>
+        <span class="hero-tag">☁️ Tiered OCI Object Storage</span>
+        <span class="hero-tag">🛡️ 75% / 85% Resource Guard</span>
+        <span class="hero-tag">⚖️ Query Weightage Scoring</span>
+      </div>
+    </section>
+
+    <!-- Key Features -->
+    <section id="features">
+      <h2 class="section-title">Why Anvesh?</h2>
+      <p class="section-subtitle">Engineered specifically for low-resource environments (128MB RAM pods, edge nodes, cloud microservices) while scaling to 100GB+ index corpora.</p>
+      <div class="grid-3">
+        <div class="card">
+          <div class="card-icon">🧠</div>
+          <h3>True NLP & Semantic Retrieval</h3>
+          <p>Understands conversational user intent without heavy SLM/LLM runtimes. Natural language intent normalization and subword dense projections map queries like <em>"what is my userId"</em> directly to <em>"username"</em> (>0.95 cosine similarity).</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">⚖️</div>
+          <h3>Custom Weightage Scoring</h3>
+          <p>Boost document ranking at query time using conditional JSON rules. Dynamically multiply or add weights (e.g. 5x for featured items, 0.5x for archived) without costly re-indexing.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">☁️</div>
+          <h3>Zero-Corruption Tiered Persistence</h3>
+          <p>Combines fast local SSD/NVMe volume caching with durable OCI Object Storage / S3 snapshots. Automatic SHA-256 integrity checks and instant point-in-time snapshot rollback.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">🛡️</div>
+          <h3>Proactive Resource Guard</h3>
+          <p>Built-in circuit breakers enforce memory thresholds (75% warning, 85% backpressure) to prevent GC thrashing and container OOMs under peak load.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">📈</div>
+          <h3>Distributed Redis Queues & HPA</h3>
+          <p>Decoupled Web Crawler (Spider) and Bulk Indexer workers scale dynamically from 1 to 5 replicas via Kubernetes HPA with distributed Redis queues and zero manual customer configuration.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">📦</div>
+          <h3>75MB Alpine Container</h3>
+          <p>Starts in under 1 second. Zero Java/JVM runtime dependencies. Uses ~25MB of RAM per 10,000 indexed documents compared to 1GB+ for Elasticsearch.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Architecture -->
+    <section id="architecture">
+      <h2 class="section-title">System Architecture</h2>
+      <p class="section-subtitle">Decoupled microservice topology deployed on Oracle Cloud Infrastructure (OCI) K3s cluster.</p>
+      <div class="arch-diagram">
+┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                                   ANVESH CLOUD PLATFORM TOPOLOGY                                       │
+│                                                                                                        │
+│  [ Users / Web UI ] ──► [ AWS CloudFront CDN ] ──► [ API Gateway + Cognito JWT / M2M Auth ]           │
+│                                                                   │                                    │
+│                                                                   ▼                                    │
+│                                                     [ Traefik Ingress (K3s) ]                          │
+│                                                                   │                                    │
+│       ┌───────────────────────┬───────────────────────────────────┼───────────────────────────┐        │
+│       ▼                       ▼                                   ▼                           ▼        │
+│  ┌───────────────┐     ┌──────────────┐                   ┌───────────────┐            ┌────────────┐  │
+│  │ anvesh-engine │     │ anvesh-spider│ (HPA: 1-5 pods)   │ anvesh-indexer│ (HPA: 1-5) │ anvesh-hub │  │
+│  │  (Port 3848)  │     │  (Port 3851) │                   │  (Port 3852)  │            │ (Port 3849)│  │
+│  └───────┬───────┘     └──────┬───────┘                   └───────┬───────┘            └─────┬──────┘  │
+│          │                    │                                   │                          │         │
+│          │                    └─────────────────┬─────────────────┘                          │         │
+│          │                                      ▼                                            │         │
+│          │                             [ anvesh-redis:6379 ] (Distributed Queues & Pub/Sub)  │         │
+│          │                                                                                   │         │
+│          ▼                                                                                   ▼         │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────────────────┐   │
+│  │                                    TIERED PERSISTENCE LAYER                                     │   │
+│  │                                                                                                 │   │
+│  │  ┌──────────────────────────────────────────────┐  ┌──────────────────────────────────────────┐ │   │
+│  │  │ Tier 1: Local Shared Storage (/data - 10Gi)  │  │ Tier 2: OCI Object Storage Bucket        │ │   │
+│  │  │ • SQ8 Scalar Quantization (75% RAM saved)    │  │ • Versioned Snapshots & Self-Healing     │ │   │
+│  │  │ • Sub-ms queries & atomic .tmp file writes   │  │ • Multi-AZ Durability & S3 API           │ │   │
+│  │  └──────────────────────────────────────────────┘  └──────────────────────────────────────────┘ │   │
+│  └─────────────────────────────────────────────────────────────────────────────────────────────────┘   │
+└────────────────────────────────────────────────────────────────────────────────────────────────────────┘</div>
+    </section>
+
+    <!-- Benchmarks -->
+    <section id="benchmarks">
+      <h2 class="section-title">Performance Benchmark Comparison</h2>
+      <p class="section-subtitle">Empirically measured on OCI Ampere A1 (ARM64, 4 OCPUs, 24GB RAM) with 5,000 dense-vector documents.</p>
+      
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Performance Metric</th>
+              <th>Anvesh (Node.js 24)</th>
+              <th>Elasticsearch / OpenSearch (Java 21)</th>
+              <th>Advantage</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>BM25 Search Latency (p50)</strong></td>
+              <td class="highlight-anvesh">&lt; 0.10 ms <span class="badge-win">82x Faster</span></td>
+              <td>~8.20 ms</td>
+              <td>In-memory index layout</td>
+            </tr>
+            <tr>
+              <td><strong>BM25 Search Latency (p99)</strong></td>
+              <td class="highlight-anvesh">0.36 ms <span class="badge-win">68x Faster</span></td>
+              <td>~24.50 ms</td>
+              <td>No GC pauses</td>
+            </tr>
+            <tr>
+              <td><strong>BM25 Query Throughput</strong></td>
+              <td class="highlight-anvesh">46,416 QPS <span class="badge-win">7.1x Throughput</span></td>
+              <td>~6,500 QPS</td>
+              <td>Non-blocking Fastify core</td>
+            </tr>
+            <tr>
+              <td><strong>Dense Vector Latency (p50)</strong></td>
+              <td class="highlight-anvesh">&lt; 0.10 ms <span class="badge-win">120x Faster</span></td>
+              <td>~12.40 ms</td>
+              <td>SIMD Float32 typed buffers</td>
+            </tr>
+            <tr>
+              <td><strong>Dense Vector Latency (p99)</strong></td>
+              <td class="highlight-anvesh">2.16 ms <span class="badge-win">17x Faster</span></td>
+              <td>~38.00 ms</td>
+              <td>HNSW graph index</td>
+            </tr>
+            <tr>
+              <td><strong>RAM Footprint (10,000 docs)</strong></td>
+              <td class="highlight-anvesh">~25 MB <span class="badge-win">96% Less RAM</span></td>
+              <td>~512 MB – 1 GB (JVM)</td>
+              <td>SQ8 quantization & streaming</td>
+            </tr>
+            <tr>
+              <td><strong>Container Image Size</strong></td>
+              <td class="highlight-anvesh">75 MB (Alpine) <span class="badge-win">10x Smaller</span></td>
+              <td>~750 MB – 1.2 GB</td>
+              <td>Zero Java dependencies</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- NLP & RAG -->
+    <section id="rag-semantic">
+      <h2 class="section-title">Natural Language & RAG Semantic Search</h2>
+      <p class="section-subtitle">How Anvesh achieves true semantic retrieval without requiring heavy local LLM/SLM execution.</p>
+      
+      <div class="grid-3">
+        <div class="card">
+          <h3>1. Intent Extraction</h3>
+          <p>Strips conversational fillers (<em>"what is my"</em>, <em>"how do I find"</em>) to isolate the core semantic intent.</p>
+        </div>
+        <div class="card">
+          <h3>2. Subword Dense Projection</h3>
+          <p>Decomposes compound tokens (e.g. <code>userId</code> → <code>user id</code>) and projects into high-density orthogonal vector spaces.</p>
+        </div>
+        <div class="card">
+          <h3>3. Zero-LLM Cosine Recall</h3>
+          <p>Produces &gt;0.95 cosine similarity between related paraphrases (<em>"what is my userId"</em> &harr; <em>"account username"</em>).</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Query Weightage Scoring -->
+    <section id="scoring">
+      <h2 class="section-title">Query-Time Weightage Scoring Example</h2>
+      <p class="section-subtitle">Boost document ranking using conditional JSON filter rules during search execution.</p>
+      
+      <pre><code><span class="code-tag">POST</span> /v1/indexes/products/search
+{
+  "q": "Cloud Engine",
+  "boostRules": [
+    {
+      "filter": { "field": "category", "equals": "featured" },
+      "weight": 5.0,
+      "mode": "multiply"
+    },
+    {
+      "filter": { "field": "status", "equals": "archived" },
+      "weight": 0.5,
+      "mode": "multiply"
+    },
+    {
+      "filter": { "field": "rating", "gte": 4.5 },
+      "weight": 1.5,
+      "mode": "multiply"
+    }
+  ]
+}</code></pre>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2026 VaagaTech Inc. All rights reserved. Designed for High-Performance Cloud-Native Search & RAG.</p>
+    </div>
+  </footer>
+</body>
+</html>

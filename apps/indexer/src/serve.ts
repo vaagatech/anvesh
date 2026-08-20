@@ -1,3 +1,4 @@
+import { globalResourceGuard } from "@vaagatech/anvesh-shared";
 /**
  * Lightweight HTTP worker so Hub / Spider can push index jobs.
  * Accepts: file path (input), crawled pages[], or documents[].
@@ -18,6 +19,7 @@ import {
   INDEXER_DEFAULT_BATCH,
   WEB_MAPPINGS,
   WEB_SETTINGS,
+  globalDeadLetter,
   type CrawledPage,
   type IndexDocumentPayload,
 } from "@vaagatech/anvesh-shared";
@@ -149,27 +151,54 @@ async function bulkToEngine(
   if (apiKeyHeader) headers.authorization = `Bearer ${apiKeyHeader}`;
   let indexed = 0;
   let failed = 0;
-  for (let i = 0; i < documents.length; i += batchSize) {
-    const slice = documents.slice(i, i + batchSize);
-    const res = await fetch(
-      `${engineUrl}/v1/indexes/${encodeURIComponent(index)}/documents/_bulk`,
-      {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ documents: slice }),
-      },
-    );
-    const json = (await res.json().catch(() => ({}))) as {
-      result?: { indexed?: number; failed?: number };
-      message?: string;
-    };
-    if (!res.ok) {
+
+  const sampleBytes = documents.length ? JSON.stringify(documents[0]).length : 2048;
+  const adaptiveBatch = globalResourceGuard.calculateAdaptiveChunkSize(documents.length, sampleBytes, batchSize);
+
+  for (let i = 0; i < documents.length; i += adaptiveBatch) {
+    await globalResourceGuard.throttleIfNeeded("indexer.bulkToEngine");
+    const slice = documents.slice(i, i + adaptiveBatch);
+    try {
+      const res = await fetch(
+        `${engineUrl}/v1/indexes/${encodeURIComponent(index)}/documents/_bulk`,
+        {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ documents: slice }),
+        },
+      );
+      const json = (await res.json().catch(() => ({}))) as {
+        result?: { indexed?: number; failed?: number };
+        message?: string;
+      };
+      if (!res.ok) {
+        failed += slice.length;
+        pushLog(job, `Bulk batch failed: ${json.message ?? res.status} — recording to dead-letter`);
+        for (const item of slice) {
+          globalDeadLetter.record({
+            source: "indexer",
+            targetIndex: index,
+            error: json.message ?? `HTTP ${res.status}`,
+            payload: item,
+          });
+        }
+      } else {
+        indexed += json.result?.indexed ?? slice.length;
+        failed += json.result?.failed ?? 0;
+        pushLog(job, `Bulk progress: ${indexed}/${documents.length}`);
+      }
+    } catch (err) {
       failed += slice.length;
-      pushLog(job, `Bulk batch failed: ${json.message ?? res.status}`);
-    } else {
-      indexed += json.result?.indexed ?? slice.length;
-      failed += json.result?.failed ?? 0;
-      pushLog(job, `Bulk progress: ${indexed}/${documents.length}`);
+      const errMsg = err instanceof Error ? err.message : String(err);
+      pushLog(job, `Bulk network error: ${errMsg}`);
+      for (const item of slice) {
+        globalDeadLetter.record({
+          source: "indexer",
+          targetIndex: index,
+          error: errMsg,
+          payload: item,
+        });
+      }
     }
   }
   return { indexed, failed };
@@ -203,14 +232,58 @@ export function startIndexerServer(port = Number(process.env.ANVESH_INDEXER_PORT
     }
 
     if (req.method === "GET" && url.pathname === "/health") {
+      const resStats = globalResourceGuard.stats();
+      const dlStats = globalDeadLetter.stats();
       res.writeHead(200, { "content-type": "application/json" });
       res.end(
         JSON.stringify({
           ok: true,
           product: "Anvesh Indexer",
           message: "Indexer worker is healthy and accepting jobs (files, pages, or documents).",
+          totalJobs: jobs.size,
+          resourceGuard: resStats,
+          deadLetter: dlStats,
         }),
       );
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/metrics") {
+      const uptimeSec = Math.round(process.uptime() * 100) / 100;
+      const resStats = globalResourceGuard.stats();
+      const dlStats = globalDeadLetter.stats();
+      const mem = process.memoryUsage();
+
+      let output = "";
+      output += `# HELP anvesh_indexer_uptime_seconds Indexer process uptime in seconds\n`;
+      output += `# TYPE anvesh_indexer_uptime_seconds gauge\n`;
+      output += `anvesh_indexer_uptime_seconds ${uptimeSec}\n\n`;
+
+      output += `# HELP anvesh_indexer_memory_heap_ratio Indexer heap utilization ratio (target <= 0.75)\n`;
+      output += `# TYPE anvesh_indexer_memory_heap_ratio gauge\n`;
+      output += `anvesh_indexer_memory_heap_ratio ${resStats.heapRatio}\n\n`;
+
+      output += `# HELP anvesh_indexer_memory_rss_bytes Indexer resident set size in bytes\n`;
+      output += `# TYPE anvesh_indexer_memory_rss_bytes gauge\n`;
+      output += `anvesh_indexer_memory_rss_bytes ${mem.rss}\n\n`;
+
+      output += `# HELP anvesh_indexer_dead_letter_total Failed indexer records in dead-letter\n`;
+      output += `# TYPE anvesh_indexer_dead_letter_total counter\n`;
+      output += `anvesh_indexer_dead_letter_total ${dlStats.totalRecorded}\n\n`;
+
+      output += `# HELP anvesh_indexer_jobs_total Total indexer jobs\n`;
+      output += `# TYPE anvesh_indexer_jobs_total gauge\n`;
+      output += `anvesh_indexer_jobs_total ${jobs.size}\n\n`;
+
+      res.writeHead(200, { "content-type": "text/plain; version=0.0.4; charset=utf-8" });
+      res.end(output);
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/v1/dead-letter") {
+      const recent = await globalDeadLetter.getRecent({ source: "indexer" });
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: true, total: recent.total, count: recent.entries.length, entries: recent.entries }));
       return;
     }
 

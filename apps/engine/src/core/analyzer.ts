@@ -1,3 +1,10 @@
+export function splitCompound(text: string): string {
+  return text
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+    .replace(/[-_.]+/g, " ");
+}
+
 /**
  * Lightweight English analyzer: normalize, tokenize, stopword filter, stem.
  * Designed for Lambda memory budgets — no native deps.

@@ -10,11 +10,17 @@ docker build -t <account>.dkr.ecr.<region>.amazonaws.com/anvesh:0.1.0 .
 docker push <account>.dkr.ecr.<region>.amazonaws.com/anvesh:0.1.0
 
 # 2. Edit anvesh.yaml — set image, host, REDIS_URL / S3 env
-# 3. Apply
+# 3. Apply workloads and Prometheus monitoring
 kubectl apply -f deploy/kubernetes/anvesh.yaml
+kubectl apply -f deploy/kubernetes/prometheus.yaml
 kubectl -n anvesh rollout status deploy/anvesh
-kubectl -n anvesh get svc,ingress
+kubectl -n anvesh get svc,ingress,pods
 ```
+
+## Observability & Prometheus Pod
+- Prometheus runs as a dedicated pod (`deploy/prometheus`) scraping `/metrics` across `anvesh-engine:3848`, `anvesh-spider:3851`, `anvesh-indexer:3852`, and `/hub/metrics` on `anvesh-hub:3849`.
+- Access Prometheus UI locally: `kubectl port-forward svc/prometheus -n anvesh 9090:9090`.
+- Universal Dead-Letter queue logs failed records to `/data/dead-letter/*.jsonl` with interactive replay in Hub UI.
 
 ## EKS notes
 

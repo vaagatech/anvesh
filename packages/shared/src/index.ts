@@ -260,3 +260,11 @@ export function enrichIndexDocument(doc: IndexDocumentPayload): IndexDocumentPay
 }
 
 export const INDEXER_DEFAULT_BATCH = 50;
+
+export { ResourceGuard, globalResourceGuard, type ResourceGuardOptions } from "./resource-guard.js";
+export {
+  DeadLetterRecorder,
+  globalDeadLetter,
+  type DeadLetterEntry,
+} from "./dead-letter.js";
+

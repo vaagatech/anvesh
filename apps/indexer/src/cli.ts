@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 /**
  * Anvesh Indexer — bulk-load documents into the engine (local library or HTTP API).
- * Suited for heavy indexing on a separate process/instance.
+ * Uses streaming to handle multi-gigabyte corpora with zero OOM spikes.
+ * VaagaTech · https://www.vaagatech.com
  */
 import { readFile, readdir } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import readline from "node:readline";
 import path from "node:path";
 import pino from "pino";
 import { z } from "zod";
@@ -19,6 +22,8 @@ import {
   INDEXER_DEFAULT_BATCH,
   WEB_MAPPINGS,
   WEB_SETTINGS,
+  globalDeadLetter,
+  globalResourceGuard,
   type CrawledPage,
   type IndexDocumentPayload,
 } from "@vaagatech/anvesh-shared";
@@ -110,38 +115,107 @@ function toPayload(raw: unknown): IndexDocumentPayload {
   return enrichIndexDocument({ fields: (raw as Record<string, unknown>) ?? {} });
 }
 
-async function loadDocuments(inputPath: string): Promise<IndexDocumentPayload[]> {
+async function streamDocuments(
+  inputPath: string,
+  onBatch: (batch: IndexDocumentPayload[]) => Promise<void>,
+  baseBatchSize: number,
+): Promise<{ total: number; batches: number }> {
   const abs = path.resolve(inputPath);
   const stat = await import("node:fs/promises").then((fs) => fs.stat(abs));
   const files: string[] = [];
   if (stat.isDirectory()) {
     const entries = await readdir(abs);
     for (const e of entries) {
-      if (e.endsWith(".json") || e.endsWith(".jsonl") || e.endsWith(".ndjson")) files.push(path.join(abs, e));
+      if (e.endsWith(".json") || e.endsWith(".jsonl") || e.endsWith(".ndjson")) {
+        files.push(path.join(abs, e));
+      }
     }
   } else {
     files.push(abs);
   }
 
-  const docs: IndexDocumentPayload[] = [];
+  let total = 0;
+  let batches = 0;
+  let pendingBatch: IndexDocumentPayload[] = [];
+  let sampleBytes = 2048;
+
   for (const file of files) {
-    const text = await readFile(file, "utf8");
     if (file.endsWith(".jsonl") || file.endsWith(".ndjson")) {
-      for (const line of text.split("\n")) {
+      const rl = readline.createInterface({
+        input: createReadStream(file, { encoding: "utf8" }),
+        crlfDelay: Infinity,
+      });
+
+      for await (const line of rl) {
         const trimmed = line.trim();
         if (!trimmed) continue;
-        docs.push(toPayload(JSON.parse(trimmed)));
+        sampleBytes = Math.max(sampleBytes, trimmed.length);
+        try {
+          const doc = toPayload(JSON.parse(trimmed));
+          pendingBatch.push(doc);
+          total++;
+        } catch (err) {
+          globalDeadLetter.record({
+            source: "indexer",
+            error: err instanceof Error ? err : String(err),
+            payload: trimmed,
+          });
+        }
+
+        const adaptiveBatchSize = globalResourceGuard.calculateAdaptiveChunkSize(
+          pendingBatch.length,
+          sampleBytes,
+          baseBatchSize,
+        );
+
+        if (pendingBatch.length >= adaptiveBatchSize) {
+          await globalResourceGuard.throttleIfNeeded("indexer.streamDocuments");
+          const batch = pendingBatch.splice(0, pendingBatch.length);
+          await onBatch(batch);
+          batches++;
+        }
       }
     } else {
+      const text = await readFile(file, "utf8");
       const parsed = JSON.parse(text) as unknown;
-      if (Array.isArray(parsed)) {
-        for (const item of parsed) docs.push(toPayload(item));
-      } else {
-        docs.push(toPayload(parsed));
+      const list = Array.isArray(parsed) ? parsed : [parsed];
+      for (const item of list) {
+        try {
+          const doc = toPayload(item);
+          pendingBatch.push(doc);
+          total++;
+        } catch (err) {
+          globalDeadLetter.record({
+            source: "indexer",
+            error: err instanceof Error ? err : String(err),
+            payload: item,
+          });
+        }
+
+        const adaptiveBatchSize = globalResourceGuard.calculateAdaptiveChunkSize(
+          pendingBatch.length,
+          sampleBytes,
+          baseBatchSize,
+        );
+
+        if (pendingBatch.length >= adaptiveBatchSize) {
+          await globalResourceGuard.throttleIfNeeded("indexer.streamDocuments");
+          const batch = pendingBatch.splice(0, pendingBatch.length);
+          await onBatch(batch);
+          batches++;
+        }
       }
     }
   }
-  return docs;
+
+  if (pendingBatch.length > 0) {
+    await globalResourceGuard.throttleIfNeeded("indexer.streamDocuments");
+    const batch = pendingBatch.splice(0, pendingBatch.length);
+    await onBatch(batch);
+    batches++;
+  }
+
+  return { total, batches };
 }
 
 async function ensureIndex(
@@ -161,74 +235,6 @@ async function ensureIndex(
   });
 }
 
-async function indexViaHttp(
-  engineUrl: string,
-  apiKey: string | undefined,
-  index: string,
-  docs: IndexDocumentPayload[],
-  batchSize: number,
-): Promise<void> {
-  const headers: Record<string, string> = { "content-type": "application/json" };
-  if (apiKey) headers.authorization = `Bearer ${apiKey}`;
-
-  await ensureIndex(engineUrl, apiKey, index).catch(() => {/* fallback to engine auto-creation */});
-
-  for (let i = 0; i < docs.length; i += batchSize) {
-    const chunk = docs.slice(i, i + batchSize);
-    const res = await fetch(`${engineUrl.replace(/\/$/, "")}/v1/indexes/${encodeURIComponent(index)}/documents/_bulk`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ documents: chunk }),
-    });
-    const body = (await res.json()) as { message?: string; ok?: boolean };
-    if (!res.ok) {
-      throw new Error(body.message ?? `Bulk index failed (${res.status})`);
-    }
-    log.info({ batch: i / batchSize + 1, count: chunk.length }, body.message ?? "batch indexed");
-  }
-}
-
-async function indexLocal(
-  index: string,
-  docs: IndexDocumentPayload[],
-  batchSize: number,
-  createIndex: boolean,
-): Promise<void> {
-  const storage = createStorage({
-    kind: (process.env.ANVESH_STORAGE as StorageKind) || "filesystem",
-    path: process.env.ANVESH_DATA_DIR,
-  });
-  const engine = new AnveshEngine(storage);
-  await engine.init();
-
-  if (createIndex) {
-    try {
-      await engine.createIndex(index, { ...WEB_MAPPINGS }, { ...WEB_SETTINGS });
-      log.info({ index }, `Index "${index}" is ready for bulk load (dynamic schema).`);
-    } catch (err) {
-      if (!(err instanceof Error) || !/already exists/i.test(err.message)) throw err;
-      log.info({ index }, `Index "${index}" already exists — appending documents.`);
-    }
-  }
-
-  for (let i = 0; i < docs.length; i += batchSize) {
-    const chunk = docs.slice(i, i + batchSize);
-    const result = await engine.bulkIndex(
-      index,
-      chunk.map((d) => ({
-        id: d.id,
-        fields: d.fields as Record<string, JsonValue>,
-        vector: d.vector,
-        meta: d.meta as Record<string, JsonValue> | undefined,
-      })),
-    );
-    log.info(
-      { indexed: result.indexed, failed: result.failed },
-      result.message,
-    );
-  }
-}
-
 async function main(): Promise<void> {
   if (process.argv[2] === "serve") {
     const { startIndexerServer } = await import("./serve.js");
@@ -239,21 +245,75 @@ async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   if (!args.index || !args.input) usage();
 
-  const docs = await loadDocuments(args.input);
-  log.info({ count: docs.length, input: args.input }, "Loaded documents for indexing.");
-
-  if (docs.length === 0) {
-    log.warn("No documents found — nothing to index.");
-    return;
-  }
-
   if (args.engineUrl) {
-    await indexViaHttp(args.engineUrl, args.apiKey, args.index, docs, args.batchSize);
-  } else {
-    await indexLocal(args.index, docs, args.batchSize, args.createIndex);
-  }
+    await ensureIndex(args.engineUrl, args.apiKey, args.index).catch(() => {});
+    const headers: Record<string, string> = { "content-type": "application/json" };
+    if (args.apiKey) headers.authorization = `Bearer ${args.apiKey}`;
 
-  log.info("Indexing finished successfully.");
+    const { total, batches } = await streamDocuments(
+      args.input,
+      async (chunk) => {
+        const res = await fetch(
+          `${args.engineUrl!.replace(/\/$/, "")}/v1/indexes/${encodeURIComponent(args.index)}/documents/_bulk`,
+          {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ documents: chunk }),
+          },
+        );
+        const body = (await res.json().catch(() => ({}))) as { message?: string; ok?: boolean };
+        if (!res.ok) {
+          log.warn({ count: chunk.length, error: body.message }, "Batch indexing failed — isolated to dead-letter");
+          for (const item of chunk) {
+            globalDeadLetter.record({
+              source: "indexer",
+              targetIndex: args.index,
+              error: body.message || `HTTP ${res.status}`,
+              payload: item,
+            });
+          }
+        } else {
+          log.info({ count: chunk.length }, body.message ?? "batch indexed");
+        }
+      },
+      args.batchSize,
+    );
+    log.info({ total, batches }, "Finished streaming indexing via HTTP.");
+  } else {
+    const storage = createStorage({
+      kind: (process.env.ANVESH_STORAGE as StorageKind) || "filesystem",
+      path: process.env.ANVESH_DATA_DIR,
+    });
+    const engine = new AnveshEngine(storage);
+    await engine.init();
+
+    if (args.createIndex) {
+      try {
+        await engine.createIndex(args.index, { ...WEB_MAPPINGS }, { ...WEB_SETTINGS });
+        log.info({ index: args.index }, `Index "${args.index}" ready.`);
+      } catch (err) {
+        if (!(err instanceof Error) || !/already exists/i.test(err.message)) throw err;
+      }
+    }
+
+    const { total, batches } = await streamDocuments(
+      args.input,
+      async (chunk) => {
+        const result = await engine.bulkIndex(
+          args.index,
+          chunk.map((d) => ({
+            id: d.id,
+            fields: d.fields as Record<string, JsonValue>,
+            vector: d.vector,
+            meta: d.meta as Record<string, JsonValue> | undefined,
+          })),
+        );
+        log.info({ indexed: result.indexed, failed: result.failed }, result.message);
+      },
+      args.batchSize,
+    );
+    log.info({ total, batches }, "Finished local streaming indexing.");
+  }
 }
 
 main().catch((err) => {

@@ -58,6 +58,7 @@
     "@fastify/helmet": "^13.1.0",
     "@fastify/rate-limit": "^10.2.2",
     "@vaagatech/anvesh-plugins": "0.4.0",
+    "@vaagatech/anvesh-shared": "0.4.0",
     "@vaagatech/vaakly": "0.4.0",
     "fastify": "^5.2.1",
     "ioredis": "^5.5.0",

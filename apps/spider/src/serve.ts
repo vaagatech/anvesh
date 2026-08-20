@@ -9,7 +9,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import Database from "better-sqlite3";
 import pino from "pino";
-import { spiderConfigSchema, type CrawledPage } from "@vaagatech/anvesh-shared";
+import { spiderConfigSchema, globalResourceGuard, globalDeadLetter, type CrawledPage } from "@vaagatech/anvesh-shared";
 import { SiteSpider } from "./crawler.js";
 
 type JobPayload = {
@@ -337,6 +337,8 @@ export function startSpiderServer(port = Number(process.env.ANVESH_SPIDER_PORT ?
       }
 
       if (req.method === "GET" && url.pathname === "/health") {
+        const resStats = globalResourceGuard.stats();
+        const dlStats = globalDeadLetter.stats();
         res.writeHead(200, { "content-type": "application/json" });
         res.end(
           JSON.stringify({
@@ -345,8 +347,50 @@ export function startSpiderServer(port = Number(process.env.ANVESH_SPIDER_PORT ?
             message: "Spider worker is healthy and accepting crawl jobs.",
             activeJobs: Array.from(jobs.values()).filter(j => j.status === "running" || j.status === "queued").length,
             totalJobs: jobs.size,
+            resourceGuard: resStats,
+            deadLetter: dlStats,
           }),
         );
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/metrics") {
+        const uptimeSec = Math.round(process.uptime() * 100) / 100;
+        const resStats = globalResourceGuard.stats();
+        const dlStats = globalDeadLetter.stats();
+        const mem = process.memoryUsage();
+        const activeJobs = Array.from(jobs.values()).filter(j => j.status === "running" || j.status === "queued").length;
+
+        let output = "";
+        output += `# HELP anvesh_spider_uptime_seconds Spider process uptime in seconds\n`;
+        output += `# TYPE anvesh_spider_uptime_seconds gauge\n`;
+        output += `anvesh_spider_uptime_seconds ${uptimeSec}\n\n`;
+
+        output += `# HELP anvesh_spider_memory_heap_ratio Spider heap utilization ratio (target <= 0.75)\n`;
+        output += `# TYPE anvesh_spider_memory_heap_ratio gauge\n`;
+        output += `anvesh_spider_memory_heap_ratio ${resStats.heapRatio}\n\n`;
+
+        output += `# HELP anvesh_spider_memory_rss_bytes Spider resident set size in bytes\n`;
+        output += `# TYPE anvesh_spider_memory_rss_bytes gauge\n`;
+        output += `anvesh_spider_memory_rss_bytes ${mem.rss}\n\n`;
+
+        output += `# HELP anvesh_spider_active_jobs Number of active crawl jobs\n`;
+        output += `# TYPE anvesh_spider_active_jobs gauge\n`;
+        output += `anvesh_spider_active_jobs ${activeJobs}\n\n`;
+
+        output += `# HELP anvesh_spider_dead_letter_total Failed crawl URLs recorded in dead-letter\n`;
+        output += `# TYPE anvesh_spider_dead_letter_total counter\n`;
+        output += `anvesh_spider_dead_letter_total ${dlStats.totalRecorded}\n\n`;
+
+        res.writeHead(200, { "content-type": "text/plain; version=0.0.4; charset=utf-8" });
+        res.end(output);
+        return;
+      }
+
+      if (req.method === "GET" && url.pathname === "/v1/dead-letter") {
+        const recent = await globalDeadLetter.getRecent({ source: "spider" });
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ ok: true, total: recent.total, count: recent.entries.length, entries: recent.entries }));
         return;
       }
 
