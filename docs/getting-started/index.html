@@ -3,13 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>System Architecture &amp; Topologies · Anvesh Search</title>
-  <meta name="description" content="Distributed search engine and vector DB architecture, microservice topology, ResourceGuard, and Dead-Letter queue mechanics.">
-  <link rel="icon" type="image/svg+xml" href="assets/images/favicon.svg">
+  <title>Getting Started in 60 Seconds · Anvesh Search</title>
+  <meta name="description" content="Quickstart guide to install, configure, ingest data, and search with Anvesh in under a minute.">
+  <link rel="icon" type="image/svg+xml" href="../assets/images/favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/site.css">
+  <link rel="stylesheet" href="../assets/css/site.css">
   <script>
     (function() {
       const savedTheme = localStorage.getItem('anvesh-theme') || 'light';
@@ -24,19 +24,19 @@
   <!-- Header -->
   <header class="site-header">
     <div class="header-container">
-      <a class="brand-wrapper" href="index.html">
-        <img src="assets/images/anvesh-logo.svg" alt="Anvesh Search" height="38">
+      <a class="brand-wrapper" href="../index.html">
+        <img src="../assets/images/anvesh-logo.svg" alt="Anvesh Search" height="38">
       </a>
       <nav aria-label="Main Navigation">
         <ul class="nav-links">
-          <li><a href="index.html">Overview</a></li>
-          <li><a href="features.html">Features</a></li>
-          <li><a href="market-comparison.html">Comparison</a></li>
-          <li><a href="why-anvesh.html">Why Anvesh</a></li>
-          <li><a href="use-cases.html">Use Cases</a></li>
-          <li><a href="architecture.html" class="active">Architecture</a></li>
-          <li><a href="getting-started.html">Documentation</a></li>
-          <li><a href="demo.html">Live Demo</a></li>
+          <li><a href="../index.html">Overview</a></li>
+          <li><a href="../features.html">Features</a></li>
+          <li><a href="../market-comparison.html">Comparison</a></li>
+          <li><a href="../why-anvesh.html">Why Anvesh</a></li>
+          <li><a href="../use-cases.html">Use Cases</a></li>
+          <li><a href="../architecture.html">Architecture</a></li>
+          <li><a href="../getting-started.html" class="active">Documentation</a></li>
+          <li><a href="../demo.html">Live Demo</a></li>
         </ul>
       </nav>
       <div class="header-actions">
@@ -48,7 +48,7 @@
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
           GitHub
         </a>
-        <a href="getting-started.html" class="btn btn-primary">Quick Start →</a>
+        <a href="../getting-started.html" class="btn btn-primary">Quick Start →</a>
       </div>
     </div>
   </header>
@@ -57,61 +57,107 @@
   <div class="doc-shell">
     <aside class="doc-sidebar">
       <div class="sidebar-group">
-        <p class="sidebar-heading">Architecture</p>
+        <p class="sidebar-heading">Quickstart</p>
         <ul class="sidebar-menu">
-          <li><a href="architecture.html" class="active">Distributed Topology</a></li>
-          <li><a href="features.html">Features &amp; Storage</a></li>
-          <li><a href="deploy.html">Deploy to K3s/K8s</a></li>
+          <li><a href="../getting-started.html" class="active">Getting Started in 60s</a></li>
+          <li><a href="../features.html">Features &amp; APIs</a></li>
+          <li><a href="../architecture.html">Architecture</a></li>
+          <li><a href="../deploy.html">Deploy to K3s/K8s</a></li>
         </ul>
       </div>
     </aside>
 
     <div class="doc-content">
       <header class="doc-header">
-        <p class="doc-eyebrow">Technical Deep Dive</p>
-        <h1 class="doc-title">Distributed System Architecture</h1>
-        <p class="doc-lead">Microservice decomposition, memory management, and failover topologies.</p>
+        <p class="doc-eyebrow">Developer Quickstart</p>
+        <h1 class="doc-title">Getting Started with Anvesh</h1>
+        <p class="doc-lead">Spin up a local search cluster, create an index, ingest documents, and run hybrid search in under 60 seconds.</p>
       </header>
 
       <main id="main-content" class="prose">
-        <h2>Cluster Microservices Topology</h2>
-        <pre><code>                     [ Client Traffic / UI ]
-                                │
-                        (Port 3849 / 3848)
-                                │
-       ┌────────────────────────┼────────────────────────┐
-       ▼                        ▼                        ▼
-[ Anvesh Hub UI ]      [ Anvesh Engine ]        [ Prometheus Pod ]
-  Control Plane          Search &amp; Vectors          Port 9090
-  Port 3849              Port 3848                 Scrapes: :3848, :3851, :3852, :3849
-       │                        │
-       ▼                        ▼
-[ Bulk Indexer ]        [ Spider Crawler ]
-  Port 3852              Port 3851
-       │                        │
-       └───────────┬────────────┘
-                   ▼
-       [ Shared Storage Tier ]
-        ├── RAM Hot Shards
-        ├── Local NVMe PVC
-        └── S3 / OCI Object Storage</code></pre>
+        <h2>1. Installation &amp; Launch</h2>
+        <p>You can run Anvesh via NPM or Docker:</p>
+        <pre><code># Option A: One-line NPX Setup
+npx @vaagatech/anvesh-setup --quickstart
 
-        <h2>1. Microservice Responsibilities</h2>
-        <ul>
-          <li><strong>Engine (<code>:3848</code>)</strong>: In-memory inverted index, vector cosine calculation, and hybrid RRF search.</li>
-          <li><strong>Hub API &amp; UI (<code>:3849</code>)</strong>: Ingestion router, Dead-Letter inspector, user RBAC, and telemetry dashboard.</li>
-          <li><strong>Spider Crawler (<code>:3851</code>)</strong>: Web crawler with rate limiting, robots.txt compliance, and role-based authentication.</li>
-          <li><strong>Indexer (<code>:3852</code>)</strong>: High-speed streaming JSON ingestion with adaptive batch sizing.</li>
-        </ul>
+# Option B: Clone &amp; Run
+git clone https://github.com/vaagatech/anvesh.git
+cd anvesh
+npm install
+npm run build
+npm start</code></pre>
 
-        <h2>2. Observability &amp; Metrics</h2>
-        <p>Every service exposes Prometheus <code>/metrics</code> scraping endpoints:</p>
-        <ul>
-          <li><code>anvesh_search_requests_total</code></li>
-          <li><code>anvesh_search_duration_seconds</code></li>
-          <li><code>anvesh_documents_indexed_total</code></li>
-          <li><code>anvesh_dead_letter_records_total</code></li>
-        </ul>
+        <h2>2. Ports &amp; Endpoints</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Service</th>
+              <th>Port</th>
+              <th>Endpoint</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Anvesh Engine</strong></td>
+              <td><code>:3848</code></td>
+              <td><code>http://localhost:3848</code></td>
+              <td>Search &amp; Vector REST API</td>
+            </tr>
+            <tr>
+              <td><strong>Hub Control Plane</strong></td>
+              <td><code>:3849</code></td>
+              <td><code>http://localhost:3849</code></td>
+              <td>Operator Web UI &amp; Ingestion API</td>
+            </tr>
+            <tr>
+              <td><strong>Spider Crawler</strong></td>
+              <td><code>:3851</code></td>
+              <td><code>http://localhost:3851</code></td>
+              <td>Site Crawler &amp; Web Scraper</td>
+            </tr>
+            <tr>
+              <td><strong>Bulk Indexer</strong></td>
+              <td><code>:3852</code></td>
+              <td><code>http://localhost:3852</code></td>
+              <td>Streaming Bulk JSON Ingestion</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h2>3. Create an Index &amp; Ingest Documents</h2>
+        <pre><code># 1. Create a search index
+curl -X POST http://localhost:3848/v1/indexes \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "products",
+    "vectorDimensions": 3
+  }'
+
+# 2. Add sample documents with text and vector embeddings
+curl -X POST http://localhost:3848/v1/indexes/products/docs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "id": "item-1",
+    "title": "Autonomous Electric Vehicle",
+    "category": "automotive",
+    "price": 45000,
+    "vector": [0.12, 0.85, 0.44]
+  }'</code></pre>
+
+        <h2>4. Execute a Hybrid Search Query</h2>
+        <pre><code>curl -X POST http://localhost:3848/v1/indexes/products/search \
+  -H "Content-Type: application/json" \
+  -d '{
+    "q": "electric car",
+    "vector": [0.10, 0.80, 0.40],
+    "mode": "hybrid",
+    "limit": 10
+  }'</code></pre>
+
+        <div class="callout">
+          <strong>Next Steps:</strong> Check out the [Production Deployment Guide](deploy.html) for Kubernetes / K3s or explore the [Market Comparison](market-comparison.html).
+        </div>
       </main>
 
       <footer style="margin-top: 4rem; padding-top: 2rem; border-top: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center; font-size: 0.88rem; color: var(--text-muted);">
