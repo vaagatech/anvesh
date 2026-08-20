@@ -405,6 +405,37 @@ pre code {
   gap: 1rem;
   flex-wrap: wrap;
 }
+
+/* Stat Cards */
+.stat-card {
+  background: var(--c-bg-mute);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  box-shadow: var(--shadow-sm);
+}
+.stat-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--c-text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 0;
+}
+.stat-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0;
+}
+.stat-detail {
+  font-size: 0.8rem;
+  color: var(--c-text-3);
+  margin: 0;
+}
 .panel-head h2 {
   font-size: 1.2rem;
   font-weight: 700;

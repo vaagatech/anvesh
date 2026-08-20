@@ -2,8 +2,10 @@
  * In-memory inverted index segment — postings + field norms + stored docs.
  */
 
-import { getAnalyzer, fieldToText } from "./analyzer.js";
+import { getAnalyzer, fieldToText, tokenize } from "./analyzer.js";
 import { bm25TermScore } from "./bm25.js";
+// @ts-ignore
+import synonyms from "synonyms";
 import { distanceFromOrigin, matchesGeo } from "./geo.js";
 import { levenshtein, resolveFuzziness, wildcardMatch } from "./fuzzy.js";
 import { globalCircuits } from "./circuit.js";
@@ -429,18 +431,53 @@ export class InvertedIndex {
     return { total, hits };
   }
 
+  public generateSemanticHighlight(
+    doc: AnveshDocument,
+    fields: string[],
+    queryText: string,
+  ): Record<string, string[]> {
+    const tokens = tokenize(queryText, { stopwords: true, stemming: false });
+    const expandedTerms = new Set<string>();
+
+    for (const t of tokens) {
+      expandedTerms.add(t);
+      const dict = synonyms(t);
+      if (dict) {
+        Object.values(dict)
+          .flat()
+          .forEach((syn: any) => expandedTerms.add(String(syn).toLowerCase()));
+      }
+    }
+
+    return this.buildHighlight(doc, fields, expandedTerms);
+  }
+
+  private truncateSnippet(text: string, maxLength = 240): string {
+    if (text.length <= maxLength) return text;
+    const sub = text.slice(0, maxLength);
+    const lastPeriod = sub.lastIndexOf(". ");
+    if (lastPeriod > maxLength * 0.5) return sub.slice(0, lastPeriod + 1);
+    const lastSpace = sub.lastIndexOf(" ");
+    if (lastSpace > 0) return sub.slice(0, lastSpace) + "…";
+    return sub + "…";
+  }
+
   private buildHighlight(
     doc: AnveshDocument,
     fields: string[],
     terms: Set<string>,
   ): Record<string, string[]> {
     const out: Record<string, string[]> = {};
-    if (terms.size === 0) return out;
 
     for (const field of fields) {
       const text = fieldToText(doc.fields[field]);
       if (!text) continue;
       
+      if (terms.size === 0) {
+        out[field] = [this.truncateSnippet(text)];
+        continue;
+      }
+
       const lower = text.toLowerCase();
       const matches: { start: number; end: number; term: string }[] = [];
       
@@ -452,7 +489,10 @@ export class InvertedIndex {
         }
       }
 
-      if (matches.length === 0) continue;
+      if (matches.length === 0) {
+        out[field] = [this.truncateSnippet(text)];
+        continue;
+      }
       matches.sort((a, b) => a.start - b.start);
 
       let bestWindow = { start: 0, end: 0, score: 0 };

@@ -688,7 +688,12 @@ export class AnveshEngine {
       total = top.length;
       hits = top.slice(from, from + size).map((r) => {
         const source = this.publicDoc(state.inverted.get(r.id)!);
-        const hit = { id: r.id, score: Math.round(r.score * 1000) / 1000, source };
+        const hit: SearchResult["hits"][number] = { id: r.id, score: Math.round(r.score * 1000) / 1000, source };
+        
+        if (query.highlight && query.q) {
+          hit.highlight = state.inverted.generateSemanticHighlight(source, textFields, query.q);
+        }
+
         if (query.geo?.origin) {
           const d = distanceFromOrigin(source.fields[query.geo.field], query.geo.origin);
           if (d !== null) return { ...hit, distanceKm: Math.round(d * 1000) / 1000 };
@@ -740,11 +745,17 @@ export class AnveshEngine {
       total = filtered.length;
       hits = filtered.slice(from, from + size).map((h) => {
         const source = this.publicDoc(h.source);
-        const base = {
+        
+        let highlight = h.highlight ?? kwRes.hits.find((k) => k.id === h.id)?.highlight;
+        if (!highlight && query.highlight && query.q) {
+          highlight = state.inverted.generateSemanticHighlight(source, textFields, query.q);
+        }
+
+        const base: SearchResult["hits"][number] = {
           ...h,
           score: Math.round(h.score * 1000) / 1000,
           source,
-          highlight: h.highlight ?? kwRes.hits.find((k) => k.id === h.id)?.highlight,
+          highlight,
         };
         if (query.geo?.origin) {
           const d = distanceFromOrigin(source.fields[query.geo.field], query.geo.origin);
