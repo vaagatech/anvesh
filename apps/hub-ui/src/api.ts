@@ -1,13 +1,25 @@
-import { extractUserClaims, isCognitoConfigured, parseJwt } from "./cognito";
+import { extractUserClaims, isCognitoConfigured, isTokenExpired, parseJwt } from "./cognito";
 const TOKEN_KEY = "anvesh.hub.token";
+const ID_TOKEN_KEY = "anvesh.hub.id_token";
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "https://fgqza9ykw7.execute-api.us-east-1.amazonaws.com/anvesh").replace(/\/$/, "");
 
 export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token) return null;
+  if (isTokenExpired(token)) {
+    setToken(null);
+    return null;
+  }
+  return token;
 }
+
 export function setToken(token: string | null) {
-  if (token) localStorage.setItem(TOKEN_KEY, token);
-  else localStorage.removeItem(TOKEN_KEY);
+  if (token) {
+    localStorage.setItem(TOKEN_KEY, token);
+  } else {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(ID_TOKEN_KEY);
+  }
 }
 
 async function hub<T = Record<string, unknown>>(
@@ -18,10 +30,16 @@ async function hub<T = Record<string, unknown>>(
   if (!headers.has("content-type") && init.body) headers.set("content-type", "application/json");
   const token = getToken();
   if (token) headers.set("authorization", `Bearer ${token}`);
-  const url = API_BASE ? `${API_BASE}${path.startsWith("/" ) ? path : `/${path}`}` : path;
+  const url = API_BASE ? `${API_BASE}${path.startsWith("/") ? path : `/${path}`}` : path;
   const res = await fetch(url, { ...init, headers });
   const json = (await res.json().catch(() => ({}))) as T & { message?: string; ok?: boolean };
   if (!res.ok) {
+    if (res.status === 401) {
+      setToken(null);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("anvesh:unauthorized"));
+      }
+    }
     throw new Error(json.message || `Request failed (${res.status})`);
   }
   return json;
@@ -34,11 +52,21 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ username, password }),
     }),
-  logout: () => hub("/hub/auth/logout", { method: "POST" }),
+  logout: () => {
+    setToken(null);
+    return hub("/hub/auth/logout", { method: "POST" }).catch(() => undefined);
+  },
   me: async (): Promise<{ user: HubUser }> => {
     const token = getToken();
-    const idToken = localStorage.getItem("anvesh.hub.id_token") || token;
-    if (token && token.split(".").length === 3) {
+    if (!token) {
+      throw new Error("No active session");
+    }
+    const idToken = localStorage.getItem(ID_TOKEN_KEY) || token;
+    if (token.split(".").length === 3) {
+      if (isTokenExpired(idToken || token)) {
+        setToken(null);
+        throw new Error("Session expired");
+      }
       const claims = extractUserClaims(idToken || token, token);
       return {
         user: {

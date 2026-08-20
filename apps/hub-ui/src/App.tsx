@@ -247,14 +247,27 @@ export function App() {
   }
 
   useEffect(() => {
-    if (!getToken()) return;
+    const onUnauthorized = () => {
+      setUser(null);
+      setToken(null);
+      flash("Session expired or unauthorized. Please sign in.", "err");
+    };
+    window.addEventListener("anvesh:unauthorized", onUnauthorized);
+
+    const token = getToken();
+    if (!token) return () => window.removeEventListener("anvesh:unauthorized", onUnauthorized);
     api
       .me()
       .then(async (r) => {
         setUser(r.user);
         await refreshAll();
       })
-      .catch(() => setToken(null));
+      .catch(() => {
+        setUser(null);
+        setToken(null);
+      });
+
+    return () => window.removeEventListener("anvesh:unauthorized", onUnauthorized);
   }, []);
 
   useEffect(() => {
@@ -437,7 +450,7 @@ export function App() {
                     const res = await cognitoRegister(username, password, email);
                     if (res.userConfirmed) {
                       const tokens = await cognitoLogin(username, password);
-                      setToken(tokens.accessToken);
+                      setToken(tokens.idToken);
                       localStorage.setItem("anvesh.hub.id_token", tokens.idToken);
                       const claims = extractUserClaims(tokens.idToken, tokens.accessToken);
                       setUser({
@@ -520,7 +533,7 @@ export function App() {
                     await cognitoConfirmRegister(username, confirmCode);
                     flash("Email verified successfully! Signing you in…");
                     const tokens = await cognitoLogin(username, password);
-                    setToken(tokens.accessToken);
+                    setToken(tokens.idToken);
                     localStorage.setItem("anvesh.hub.id_token", tokens.idToken);
                     const claims = extractUserClaims(tokens.idToken, tokens.accessToken);
                     setUser({

@@ -65,6 +65,7 @@ export interface CognitoUserClaims {
 export function parseJwt(token: string): Record<string, any> {
   try {
     const base64Url = token.split(".")[1];
+    if (!base64Url) return {};
     const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
     const jsonPayload = decodeURIComponent(
       atob(base64)
@@ -75,6 +76,18 @@ export function parseJwt(token: string): Record<string, any> {
     return JSON.parse(jsonPayload);
   } catch {
     return {};
+  }
+}
+
+/** Check if JWT token is expired */
+export function isTokenExpired(token: string): boolean {
+  try {
+    const claims = parseJwt(token);
+    if (!claims || typeof claims.exp !== "number") return false;
+    // Add 10-second buffer
+    return (claims.exp * 1000) <= (Date.now() + 10000);
+  } catch {
+    return true;
   }
 }
 

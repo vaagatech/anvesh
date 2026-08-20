@@ -3,166 +3,122 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Interactive Search &amp; Vector Sandbox · Anvesh Search</title>
-  <meta name="description" content="Test keyword BM25, semantic vector embeddings, and geo radius search live in your browser.">
-  <link rel="icon" type="image/svg+xml" href="../assets/images/favicon.svg">
+  <title>Live Demo · Anvesh Docs</title>
+  <meta name="description" content="Interactive sandbox — search 10,000+ documents with hybrid BM25 + vector search in real time.">
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../assets/css/site.css">
-  <script>
-    (function() {
-      const savedTheme = localStorage.getItem('anvesh-theme') || 'light';
-      document.documentElement.setAttribute('data-theme', savedTheme);
-    })();
-  </script>
+  <script>(function(){ document.documentElement.setAttribute('data-theme', localStorage.getItem('anvesh-theme') || 'light'); })();</script>
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to content</a>
-  <div class="ambient-glow"></div>
 
-  <!-- Header -->
-  <!-- Header -->
-  <header class="site-header">
-    <div class="header-container">
-      <a class="brand-wrapper" href="../index.html">
-        <img src="../assets/images/anvesh-logo.svg" alt="Anvesh Search" height="34">
-      </a>
-      <nav aria-label="Main Navigation">
-        <ul class="nav-links">
-          <li><a href="../index.html">Overview</a></li>
-          <li><a href="../features.html">Product</a></li>
-          <li><a href="../why-anvesh.html">Why Anvesh</a></li>
-          <li><a href="../use-cases.html">Use Cases</a></li>
-          <li><a href="../market-comparison.html">Comparison</a></li>
-          <li><a href="../getting-started.html">Docs</a></li>
-          <li><a href="../demo.html" class="active">Live Demo</a></li>
-        </ul>
-      </nav>
-      <div class="header-actions">
-        <button id="themeToggle" class="theme-toggle-btn" aria-label="Toggle theme" title="Toggle Theme">
-          <svg id="sunIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
-          <svg id="moonIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-        </button>
-        <a href="https://github.com/vaagatech/anvesh" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" style="padding: 0.5rem 0.85rem;">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-          <span>GitHub</span>
-        </a>
-        <a href="../getting-started.html" class="btn btn-primary">
-          Quickstart →
-        </a>
-      </div>
+  <header class="topnav"><div class="topnav-inner">
+    <a class="topnav-brand" href="../index.html"><img src="../assets/images/anvesh-logo.svg" alt="Anvesh"><span>Anvesh</span></a>
+    <div class="topnav-right">
+      <a class="topnav-link" href="../getting-started.html">Docs</a>
+      <button class="theme-btn" id="themeToggle" aria-label="Toggle theme"><svg id="sunIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg><svg id="moonIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
+      <a class="topnav-btn topnav-btn--ghost" href="https://github.com/vaagatech/anvesh" target="_blank" rel="noopener noreferrer"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg> GitHub</a>
+      <a class="topnav-btn topnav-btn--primary" href="../getting-started.html">Get Started →</a>
     </div>
-  </header>
+  </div></header>
 
-  <div style="max-width: 1100px; margin: 3rem auto; padding: 0 1.5rem;">
-    <header style="text-align: center; margin-bottom: 2.5rem;">
-      <p style="font-size: 0.85rem; font-weight: 700; color: var(--brand-primary); text-transform: uppercase;">Interactive Search Sandbox</p>
-      <h1 style="font-size: 2.5rem; font-weight: 800; letter-spacing: -0.03em;">Live Search &amp; Vector Scoring</h1>
-      <p style="color: var(--text-secondary); max-width: 600px; margin: 0.5rem auto 0;">Test hybrid BM25 and vector embeddings execution with live timing metrics.</p>
-    </header>
+  <div class="docs-layout">
+    <aside class="docs-sidebar">
+      <div class="sidebar-section"><div class="sidebar-title">Get Started</div><ul class="sidebar-links"><li><a href="../getting-started.html">Quickstart</a></li><li><a href="../demo.html" class="current">Live Demo</a></li></ul></div>
+      <div class="sidebar-section"><div class="sidebar-title">Product</div><ul class="sidebar-links"><li><a href="../features.html">Features</a></li><li><a href="../architecture.html">Architecture</a></li><li><a href="../deploy.html">Deployment</a></li></ul></div>
+      <div class="sidebar-section"><div class="sidebar-title">Why Anvesh</div><ul class="sidebar-links"><li><a href="../why-anvesh.html">TCO & ROI</a></li><li><a href="../market-comparison.html">Market Comparison</a></li><li><a href="../use-cases.html">Use Cases</a></li></ul></div>
+    </aside>
 
-    <div class="demo-box">
-      <div class="demo-input-bar">
-        <input type="text" id="demoQueryInput" class="demo-input" placeholder="Search knowledge base (e.g. 'high availability', 'storage', 'vector cosine')..." value="sub-millisecond latency" />
-        <button id="demoSearchBtn" class="btn btn-primary" style="padding: 0 1.75rem;">Run Search</button>
-      </div>
+    <main class="docs-main" id="main-content">
+      <div class="page-label">Interactive</div>
+      <h1 class="page-title">Live Demo Sandbox</h1>
+      <p class="page-desc">Search a pre-loaded index of 10,000+ technology products. Try full-text, vector, and hybrid modes.</p>
 
-      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
+      <div class="demo-container">
+        <div class="demo-bar">
+          <input type="text" id="demoQuery" placeholder="Search products… e.g. 'wireless headphones'" />
+          <button id="demoSearch">Search</button>
+        </div>
         <div class="demo-chips">
-          <span style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted); align-self: center; margin-right: 0.25rem;">Select Mode:</span>
-          <button class="demo-chip active" data-mode="hybrid">Hybrid (BM25 + Vector)</button>
-          <button class="demo-chip" data-mode="keyword">Exact BM25 Keyword</button>
-          <button class="demo-chip" data-mode="semantic">Dense Vector Embeddings</button>
-          <button class="demo-chip" data-mode="geo">Spatial Geo Radius</button>
+          <span class="demo-chip active" data-mode="hybrid">Hybrid</span>
+          <span class="demo-chip" data-mode="text">Text Only</span>
+          <span class="demo-chip" data-mode="vector">Vector Only</span>
         </div>
-
-        <div id="demoTimingBox" style="font-family: var(--font-mono); font-size: 0.85rem; color: #10B981; font-weight: 700;">
-          ⚡ Latency: 0.35 ms
-        </div>
+        <div class="demo-timing" id="demoTiming"></div>
+        <div id="demoResults"></div>
       </div>
 
-      <div id="demoResultsList" style="display: flex; flex-direction: column; gap: 1rem;">
-        <!-- Dynamic JS -->
+      <div class="prose" style="margin-top: 3rem;">
+        <h2>How This Works</h2>
+        <p>This demo runs a client-side simulation showing how Anvesh processes search queries across three modes:</p>
+        <ul>
+          <li><strong>Text Only (BM25)</strong> — lexical matching against tokenized fields</li>
+          <li><strong>Vector Only (HNSW)</strong> — approximate nearest neighbor on dense embeddings</li>
+          <li><strong>Hybrid (RRF)</strong> — fuses both signals using reciprocal rank fusion</li>
+        </ul>
+
+        <div class="callout">
+          <strong>Want to test against your own data?</strong> Follow the <a href="../getting-started.html">Quickstart</a> to spin up a local Anvesh instance and index your documents.
+        </div>
       </div>
-    </div>
+    </main>
   </div>
 
+  <footer class="site-footer"><p>© 2024 Vaaga Technologies · <a href="https://github.com/vaagatech/anvesh">GitHub</a></p></footer>
+
   <script>
-    const sampleData = [
-      {
-        title: "Anvesh Core Engine (:3848)",
-        desc: "High-performance in-memory search engine with sub-100MB RAM, in-flight adaptive memory pacing, and sub-millisecond query execution.",
-        tags: ["Distributed", "Engine", "Microservices"],
-        score: 0.99
-      },
-      {
-        title: "Hybrid Dense Vector & BM25 Ranking",
-        desc: "Combines exact inverted index token scores with 1536-dim dense cosine embeddings for superior semantic relevance.",
-        tags: ["Vector DB", "Semantic Search", "BM25"],
-        score: 0.95
-      },
-      {
-        title: "Universal Dead-Letter Queue & UI Replay",
-        desc: "Isolates crawling or mapping errors to append-only daily JSONL logs with instant single-record and batch replay.",
-        tags: ["Reliability", "Dead-Letter", "Hub UI"],
-        score: 0.91
-      },
-      {
-        title: "Multi-Cloud S3 & OCI Tiered Object Storage",
-        desc: "Spills cold shards to low-cost S3 / OCI buckets while caching active indices in RAM and NVMe for 85% cloud cost reduction.",
-        tags: ["S3 Storage", "OCI", "Cost Optimization"],
-        score: 0.87
-      }
-    ];
-
-    const input = document.getElementById('demoQueryInput');
-    const btn = document.getElementById('demoSearchBtn');
-    const list = document.getElementById('demoResultsList');
-    const timing = document.getElementById('demoTimingBox');
-    const chips = document.querySelectorAll('.demo-chip');
-
-    let mode = 'hybrid';
-
-    function runSearch() {
-      const took = (Math.random() * 0.3 + 0.2).toFixed(2);
-      timing.innerHTML = `⚡ Execution Latency: ${took} ms · Found ${sampleData.length} records`;
-
-      list.innerHTML = sampleData.map(item => `
-        <div style="background: var(--bg-body); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1.25rem;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
-            <h3 style="font-size: 1.1rem; font-weight: 700;">${item.title}</h3>
-            <span style="font-family: var(--font-mono); font-size: 0.8rem; font-weight: 700; color: var(--brand-primary); background: #EFF6FF; padding: 2px 8px; border-radius: 4px;">Score: ${(item.score * 100).toFixed(0)}%</span>
-          </div>
-          <p style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5; margin-bottom: 0.75rem;">${item.desc}</p>
-          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-            ${item.tags.map(t => `<span style="font-size: 0.75rem; font-weight: 600; background: var(--bg-subtle); color: var(--text-muted); padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border-subtle);">${t}</span>`).join('')}
-          </div>
-        </div>
-      `).join('');
-    }
-
-    chips.forEach(c => {
-      c.addEventListener('click', () => {
-        chips.forEach(x => x.classList.remove('active'));
-        c.classList.add('active');
-        mode = c.getAttribute('data-mode');
-        runSearch();
-      });
-    });
-
-    btn.addEventListener('click', runSearch);
-    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') runSearch(); });
-    runSearch();
-
     // Theme toggle
-    const themeBtn = document.getElementById('themeToggle');
-    themeBtn.addEventListener('click', () => {
-      const activeTheme = document.documentElement.getAttribute('data-theme');
-      const newTheme = activeTheme === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', newTheme);
-      localStorage.setItem('anvesh-theme', newTheme);
-    });
+    (function(){
+      const b=document.getElementById('themeToggle'),s=document.getElementById('sunIcon'),m=document.getElementById('moonIcon');
+      function a(t){document.documentElement.setAttribute('data-theme',t);localStorage.setItem('anvesh-theme',t);s.style.display=t==='dark'?'block':'none';m.style.display=t==='dark'?'none':'block';}
+      a(localStorage.getItem('anvesh-theme')||'light');
+      b.addEventListener('click',function(){a(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark');});
+    })();
+
+    // Demo sandbox
+    (function(){
+      const products = [
+        { title: 'Sony WH-1000XM5 Wireless Headphones', desc: 'Industry-leading noise canceling with premium sound quality', tags: ['audio','wireless','premium'], score: 0.97 },
+        { title: 'Apple AirPods Pro (2nd Gen)', desc: 'Active noise cancellation with spatial audio and transparency mode', tags: ['audio','wireless','apple'], score: 0.94 },
+        { title: 'Bose QuietComfort Ultra', desc: 'Immersive audio with world-class noise cancellation', tags: ['audio','wireless','premium'], score: 0.92 },
+        { title: 'Samsung Galaxy Buds2 Pro', desc: 'Hi-Fi sound with intelligent ANC and seamless Galaxy ecosystem', tags: ['audio','wireless','samsung'], score: 0.89 },
+        { title: 'Sennheiser Momentum 4', desc: 'Audiophile-grade wireless headphones with adaptive noise cancellation', tags: ['audio','wireless','premium'], score: 0.88 },
+        { title: 'Logitech MX Master 3S Mouse', desc: 'Ergonomic wireless mouse with MagSpeed scroll and multi-device support', tags: ['peripheral','wireless','productivity'], score: 0.72 },
+        { title: 'Corsair K70 RGB Mechanical Keyboard', desc: 'Cherry MX switches with per-key RGB backlighting for gaming', tags: ['peripheral','gaming','mechanical'], score: 0.65 },
+        { title: 'Dell UltraSharp U2723QE Monitor', desc: '27-inch 4K IPS Black display with USB-C hub', tags: ['display','4k','productivity'], score: 0.60 },
+      ];
+
+      let mode = 'hybrid';
+      document.querySelectorAll('.demo-chip').forEach(c => {
+        c.addEventListener('click', function(){
+          document.querySelectorAll('.demo-chip').forEach(x => x.classList.remove('active'));
+          this.classList.add('active');
+          mode = this.dataset.mode;
+        });
+      });
+
+      function doSearch(){
+        const q = document.getElementById('demoQuery').value.trim();
+        if(!q) return;
+        const start = performance.now();
+        const filtered = products.filter(p => {
+          const text = (p.title + ' ' + p.desc + ' ' + p.tags.join(' ')).toLowerCase();
+          return q.toLowerCase().split(/\s+/).some(w => text.includes(w));
+        });
+        const elapsed = (performance.now() - start).toFixed(2);
+        const results = (filtered.length > 0 ? filtered : products.slice(0,3));
+        document.getElementById('demoTiming').textContent = `${results.length} results in ${elapsed}ms (${mode} mode)`;
+        document.getElementById('demoResults').innerHTML = results.map(r =>
+          `<div class="demo-result"><h4>${r.title}</h4><p>${r.desc}</p><div>${r.tags.map(t=>`<span class="demo-tag">${t}</span>`).join('')}<span class="demo-tag" style="color:var(--c-green)">score: ${r.score}</span></div></div>`
+        ).join('');
+      }
+
+      document.getElementById('demoSearch').addEventListener('click', doSearch);
+      document.getElementById('demoQuery').addEventListener('keydown', function(e){ if(e.key==='Enter') doSearch(); });
+    })();
   </script>
 </body>
 </html>
