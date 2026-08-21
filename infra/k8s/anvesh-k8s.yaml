@@ -137,6 +137,8 @@ metadata:
     app.kubernetes.io/name: anvesh-engine
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: anvesh-engine
@@ -219,6 +221,8 @@ metadata:
     app.kubernetes.io/name: anvesh-spider
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: anvesh-spider
@@ -301,6 +305,8 @@ metadata:
     app.kubernetes.io/name: anvesh-indexer
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: anvesh-indexer
@@ -383,6 +389,8 @@ metadata:
     app.kubernetes.io/name: anvesh-hub
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: anvesh-hub
@@ -439,6 +447,22 @@ spec:
           persistentVolumeClaim:
             claimName: anvesh-shared-data-pvc
 ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: anvesh-hub-service
+  namespace: anvesh
+  labels:
+    app.kubernetes.io/name: anvesh-hub
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: anvesh-hub
+  ports:
+    - name: http
+      port: 3849
+      targetPort: 3849
+---
 # Traefik StripPrefix Middleware: strips "/anvesh" so Hub receives "/hub/..." and Engine receives native endpoints
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
@@ -450,47 +474,48 @@ spec:
     prefixes:
       - /anvesh
 ---
-# Ingress routing /anvesh/hub to Hub, /anvesh/spider to Spider, /anvesh/indexer to Indexer, /anvesh to Engine
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+# Traefik Native IngressRoute CRD for precise path routing and priority
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
 metadata:
-  name: anvesh-ingress
+  name: anvesh-ingress-route
   namespace: anvesh
-  annotations:
-    ingress.kubernetes.io/ssl-redirect: "false"
-    traefik.ingress.kubernetes.io/router.middlewares: anvesh-anvesh-strip-prefix@kubernetescrd
 spec:
-  rules:
-    - http:
-        paths:
-          - path: /anvesh/hub
-            pathType: Prefix
-            backend:
-              service:
-                name: anvesh-hub-service
-                port:
-                  number: 3849
-          - path: /anvesh/spider
-            pathType: Prefix
-            backend:
-              service:
-                name: anvesh-spider-service
-                port:
-                  number: 3851
-          - path: /anvesh/indexer
-            pathType: Prefix
-            backend:
-              service:
-                name: anvesh-indexer-service
-                port:
-                  number: 3852
-          - path: /anvesh
-            pathType: Prefix
-            backend:
-              service:
-                name: anvesh-engine-service
-                port:
-                  number: 3848
+  entryPoints:
+    - web
+  routes:
+    - match: PathPrefix(`/anvesh/hub`)
+      kind: Rule
+      priority: 100
+      middlewares:
+        - name: anvesh-strip-prefix
+      services:
+        - name: anvesh-hub-service
+          port: 3849
+    - match: PathPrefix(`/anvesh/spider`)
+      kind: Rule
+      priority: 100
+      middlewares:
+        - name: anvesh-strip-prefix
+      services:
+        - name: anvesh-spider-service
+          port: 3851
+    - match: PathPrefix(`/anvesh/indexer`)
+      kind: Rule
+      priority: 100
+      middlewares:
+        - name: anvesh-strip-prefix
+      services:
+        - name: anvesh-indexer-service
+          port: 3852
+    - match: PathPrefix(`/anvesh`)
+      kind: Rule
+      priority: 10
+      middlewares:
+        - name: anvesh-strip-prefix
+      services:
+        - name: anvesh-engine-service
+          port: 3848
 ---
 # =========================================================================
 # Horizontal Pod Autoscalers (75% Target Threshold for ALL Microservices)

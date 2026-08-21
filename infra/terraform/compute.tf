@@ -1,9 +1,42 @@
+# =========================================================================
+# OCI Compute Instances Configuration (Multi-Node Multi-Arch K3s Cluster)
+# 1 Control Plane (ARM64) + 3 Worker Nodes (1 ARM64 + 2 AMD64 Micro)
+# =========================================================================
+
+data "oci_identity_availability_domains" "ads" {
+  compartment_id = var.tenancy_ocid
+}
+
+# Dynamic OS Image Lookups for Ubuntu 22.04
+data "oci_core_images" "ubuntu_amd64" {
+  compartment_id           = var.tenancy_ocid
+  operating_system         = "Canonical Ubuntu"
+  operating_system_version = "22.04"
+  shape                    = "VM.Standard.E2.1.Micro"
+  sort_by                  = "TIMECREATED"
+  sort_order               = "DESC"
+}
+
+data "oci_core_images" "ubuntu_arm64" {
+  compartment_id           = var.tenancy_ocid
+  operating_system         = "Canonical Ubuntu"
+  operating_system_version = "22.04"
+  shape                    = "VM.Standard.A1.Flex"
+  sort_by                  = "TIMECREATED"
+  sort_order               = "DESC"
+}
+
+# 1. Master ARM Node (Control Plane)
 resource "oci_core_instance" "k3s_master" {
-  # FIXED: Added [0] index to resolve multi-domain structures correctly
   availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
   compartment_id      = var.tenancy_ocid
-  display_name        = "k3s-master-arm"
   shape               = "VM.Standard.A1.Flex"
+  display_name        = "k3s-master-arm"
+
+  shape_config {
+    ocpus         = 1
+    memory_in_gbs = 6
+  }
 
   create_vnic_details {
     subnet_id        = oci_core_subnet.k3s_subnet.id
@@ -12,39 +45,103 @@ resource "oci_core_instance" "k3s_master" {
   }
 
   source_details {
-    source_type = "image"
-    # FIXED: Added .images[0].id for robust image query matching
+    source_type             = "image"
     source_id               = data.oci_core_images.ubuntu_arm64.images[0].id
     boot_volume_size_in_gbs = 50
   }
+
+  metadata = {
+    ssh_authorized_keys = var.ssh_public_key
+    user_data           = base64encode(file("${path.module}/../scripts/bootstrap-master.sh"))
+  }
+
+  lifecycle {
+    ignore_changes = [metadata]
+  }
+}
+
+# 2. Worker 1 ARM Node
+resource "oci_core_instance" "k3s_worker_arm" {
+  availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
+  compartment_id      = var.tenancy_ocid
+  shape               = "VM.Standard.A1.Flex"
+  display_name        = "k3s-worker-arm"
 
   shape_config {
     ocpus         = 1
     memory_in_gbs = 6
   }
 
-  metadata = {
-    ssh_authorized_keys = var.ssh_public_key
-    # FIXED: Reconstructed clear bash string payload blocks
-    user_data = base64encode(<<-EOF
-      #!/bin/bash
-      sudo dd if=/dev/zero of=/swapfile bs=1M count=2048
-      sudo chmod 600 /swapfile
-      sudo mkswap /swapfile
-      sudo swapon /swapfile
-      echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
-      sudo iptables -F
-      sudo iptables-save | sudo tee /etc/iptables/rules.v4
-      curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="server --write-kubeconfig-mode 644 --tls-san $(curl -s https://ifconfig.me)" sh -
-      until [ -f /var/lib/rancher/k3s/server/node-token ]; do sleep 2; done
-      TOKEN=$(cat /var/lib/rancher/k3s/server/node-token)
-      echo -e "HTTP/1.1 200 OK\r\nContent-Length: $${#TOKEN}\r\n\r\n$${TOKEN}" > /tmp/token_response
-      while true; do nc -l -p 8000 < /tmp/token_response; done &
-    EOF
-    )
+  create_vnic_details {
+    subnet_id        = oci_core_subnet.k3s_subnet.id
+    assign_public_ip = true
+    display_name     = "k3s-worker-arm-vnic"
   }
 
-  lifecycle {
-    ignore_changes = [metadata]
+  source_details {
+    source_type             = "image"
+    source_id               = data.oci_core_images.ubuntu_arm64.images[0].id
+    boot_volume_size_in_gbs = 50
+  }
+
+  metadata = {
+    ssh_authorized_keys = var.ssh_public_key
+    user_data = base64encode(templatefile("${path.module}/../scripts/bootstrap-worker.sh", {
+      master_ip = oci_core_instance.k3s_master.private_ip
+    }))
+  }
+}
+
+# 3. Worker 2 AMD Micro Node
+resource "oci_core_instance" "k3s_worker_amd1" {
+  availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
+  compartment_id      = var.tenancy_ocid
+  shape               = "VM.Standard.E2.1.Micro"
+  display_name        = "k3s-worker-amd1"
+
+  create_vnic_details {
+    subnet_id        = oci_core_subnet.k3s_subnet.id
+    assign_public_ip = true
+    display_name     = "k3s-worker-amd1-vnic"
+  }
+
+  source_details {
+    source_type             = "image"
+    source_id               = data.oci_core_images.ubuntu_amd64.images[0].id
+    boot_volume_size_in_gbs = 50
+  }
+
+  metadata = {
+    ssh_authorized_keys = var.ssh_public_key
+    user_data = base64encode(templatefile("${path.module}/../scripts/bootstrap-worker.sh", {
+      master_ip = oci_core_instance.k3s_master.private_ip
+    }))
+  }
+}
+
+# 4. Worker 3 AMD Micro Node
+resource "oci_core_instance" "k3s_worker_amd2" {
+  availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
+  compartment_id      = var.tenancy_ocid
+  shape               = "VM.Standard.E2.1.Micro"
+  display_name        = "k3s-worker-amd2"
+
+  create_vnic_details {
+    subnet_id        = oci_core_subnet.k3s_subnet.id
+    assign_public_ip = true
+    display_name     = "k3s-worker-amd2-vnic"
+  }
+
+  source_details {
+    source_type             = "image"
+    source_id               = data.oci_core_images.ubuntu_amd64.images[0].id
+    boot_volume_size_in_gbs = 50
+  }
+
+  metadata = {
+    ssh_authorized_keys = var.ssh_public_key
+    user_data = base64encode(templatefile("${path.module}/../scripts/bootstrap-worker.sh", {
+      master_ip = oci_core_instance.k3s_master.private_ip
+    }))
   }
 }

@@ -10,6 +10,21 @@ output "k3s_master_private_ip" {
   value       = oci_core_instance.k3s_master.private_ip
 }
 
+output "k3s_worker_arm_public_ip" {
+  description = "Public IP address of Worker 1 (ARM64)"
+  value       = oci_core_instance.k3s_worker_arm.public_ip
+}
+
+output "k3s_worker_amd1_public_ip" {
+  description = "Public IP address of Worker 2 (AMD64 Micro 1)"
+  value       = oci_core_instance.k3s_worker_amd1.public_ip
+}
+
+output "k3s_worker_amd2_public_ip" {
+  description = "Public IP address of Worker 3 (AMD64 Micro 2)"
+  value       = oci_core_instance.k3s_worker_amd2.public_ip
+}
+
 output "oci_nlb_public_ip" {
   description = "Public IP address of the OCI Free Tier Network Load Balancer"
   value       = oci_network_load_balancer_network_load_balancer.k3s_free_nlb.ip_addresses[0].ip_address
