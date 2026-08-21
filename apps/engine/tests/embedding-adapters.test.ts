@@ -140,4 +140,36 @@ describe("AnveshEngine with Default Micro-Transformer & Orthogonal Config", () =
     expect(vecHindi.length).toBe(384);
     expect(vecEnglish.length).toBe(384);
   });
+
+  it("dynamically resolves vector dimensions when creating index without hardcoded dimension numbers", async () => {
+    // 1. Index with Gemini adapter -> automatically 768 dimensions
+    const geminiIndex = await engine.createIndex("gemini_catalog", {
+      title: { type: "text" },
+    }, {
+      embeddingConfig: { provider: "gemini", apiKey: "mock-key" },
+    });
+    expect(geminiIndex.settings?.vectorDimensions).toBe(768);
+
+    // 2. Index with Orthogonal adapter -> automatically 512 dimensions
+    const orthoIndex = await engine.createIndex("ortho_catalog", {
+      title: { type: "text" },
+    }, {
+      embeddingConfig: { provider: "orthogonal" },
+    });
+    expect(orthoIndex.settings?.vectorDimensions).toBe(512);
+
+    // 3. Index with OpenAI adapter -> automatically 1536 dimensions
+    const openaiIndex = await engine.createIndex("openai_catalog", {
+      title: { type: "text" },
+    }, {
+      embeddingConfig: { provider: "openai", apiKey: "mock-key" },
+    });
+    expect(openaiIndex.settings?.vectorDimensions).toBe(1536);
+
+    // 4. Default index -> automatically 384 dimensions from MicroTransformer
+    const defaultIndex = await engine.createIndex("default_catalog", {
+      title: { type: "text" },
+    });
+    expect(defaultIndex.settings?.vectorDimensions).toBe(384);
+  });
 });

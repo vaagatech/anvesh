@@ -489,3 +489,17 @@ export function createEmbeddingAdapter(config?: EmbeddingConfig): EmbeddingAdapt
       return new MicroTransformerEmbeddingAdapter(config);
   }
 }
+
+/**
+ * Resolves the vector dimensions for a given embedding configuration dynamically.
+ * If explicitly provided in config.dimensions, returns that.
+ * Otherwise, queries the configured adapter for its native defaultDimensions.
+ */
+export function resolveEmbeddingDimensions(config?: EmbeddingConfig): number {
+  if (config?.dimensions && config.dimensions > 0) {
+    return config.dimensions;
+  }
+  const adapter = createEmbeddingAdapter(config);
+  return adapter.defaultDimensions;
+}
+

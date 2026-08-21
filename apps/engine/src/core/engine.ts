@@ -9,7 +9,7 @@ import { VectorStore, type VectorStoreSnapshot } from "./vector-store.js";
 import { blendScores, reciprocalRankFusion } from "./hybrid.js";
 import { assertGeoPoint, distanceFromOrigin, validateGeoQuery } from "./geo.js";
 import { localEmbed, textFromFields, meaningfulVectorHits } from "./embed.js";
-import { createEmbeddingAdapter } from "./embedding-adapters.js";
+import { createEmbeddingAdapter, resolveEmbeddingDimensions } from "./embedding-adapters.js";
 import { globalCircuits } from "./circuit.js";
 import {
   coerceDocumentFields,
@@ -187,7 +187,13 @@ export class AnveshEngine {
     if (this.indexes.has(name)) {
       throw new AnveshError("ERR_INDEX_EXISTS", { name });
     }
-    const resolvedSettings: IndexSettings = { dynamicMapping: true, ...settings };
+    const autoVectorDims =
+      settings.autoEmbed !== false || settings.embeddingConfig
+        ? resolveEmbeddingDimensions(settings.embeddingConfig)
+        : undefined;
+    const effectiveVectorDims = settings.vectorDimensions ?? autoVectorDims;
+
+    const resolvedSettings: IndexSettings = { dynamicMapping: true, ...settings, vectorDimensions: effectiveVectorDims };
     const now = new Date().toISOString();
     const definition: IndexDefinition = {
       name,
@@ -198,9 +204,9 @@ export class AnveshEngine {
       docCount: 0,
     };
     const inverted = new InvertedIndex(definition.mappings, resolvedSettings);
-    const vectors = settings.vectorDimensions
+    const vectors = effectiveVectorDims
       ? new VectorStore(
-          settings.vectorDimensions,
+          effectiveVectorDims,
           settings.vectorMetric ?? "cosine",
           settings.vectorIndexType ?? "flat",
           settings.vectorQuantization ?? "none",
@@ -418,10 +424,11 @@ export class AnveshEngine {
     try {
       return this.require(indexName);
     } catch {
+      const defaultDims = resolveEmbeddingDimensions();
       await this.createIndex(
         indexName,
         {},
-        { dynamicMapping: true, vectorDimensions: 384 },
+        { dynamicMapping: true, vectorDimensions: defaultDims, autoEmbed: true },
       );
       return this.require(indexName);
     }
