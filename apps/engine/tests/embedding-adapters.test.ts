@@ -172,4 +172,50 @@ describe("AnveshEngine with Default Micro-Transformer & Orthogonal Config", () =
     });
     expect(defaultIndex.settings?.vectorDimensions).toBe(384);
   });
+
+  it("migrates existing index with 512-d orthogonal vectors to new 384-d transformer vectors in-place", async () => {
+    await engine.createIndex("legacy_store", {
+      title: { type: "text" },
+      body: { type: "text" },
+    }, {
+      vectorDimensions: 512,
+      embeddingConfig: { provider: "orthogonal", dimensions: 512 },
+    });
+
+    await engine.indexDocument("legacy_store", {
+      id: "prod-1",
+      fields: { title: "Kanjivaram Saree", body: "Pure silk wedding saree with elephant motifs" },
+    });
+
+    await engine.indexDocument("legacy_store", {
+      id: "prod-2",
+      fields: { title: "Cotton Kurti", body: "Casual office daily wear" },
+    });
+
+    const preMigration = engine.getIndex("legacy_store");
+    expect(preMigration?.settings?.vectorDimensions).toBe(512);
+
+    // Run in-place vector migration to 384-d
+    const migrationResult = await engine.migrateIndexVectors("legacy_store", {
+      dimensions: 384,
+      embeddingConfig: { provider: "micro-transformer" },
+    });
+
+    expect(migrationResult.ok).toBe(true);
+    expect(migrationResult.migratedCount).toBe(2);
+    expect(migrationResult.previousDimensions).toBe(512);
+    expect(migrationResult.newDimensions).toBe(384);
+
+    const postMigration = engine.getIndex("legacy_store");
+    expect(postMigration?.settings?.vectorDimensions).toBe(384);
+
+    // Verify semantic search works seamlessly on the migrated index
+    const searchRes = await engine.search("legacy_store", {
+      q: "wedding silk garment",
+      mode: "semantic",
+    });
+
+    expect(searchRes.hits.length).toBeGreaterThan(0);
+    expect(searchRes.hits[0]?.id).toBe("prod-1");
+  });
 });

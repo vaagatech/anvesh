@@ -87,4 +87,37 @@ export class IndexesClient {
     const data = (await res.json()) as { ok: boolean; suggestions: import("./types.js").AutocompleteSuggestion[] };
     return data.suggestions;
   }
+
+  async migrateVectors(
+    name: string,
+    options: {
+      dimensions?: number;
+      embeddingConfig?: Record<string, any>;
+      batchSize?: number;
+    } = {}
+  ): Promise<{
+    ok: boolean;
+    index: string;
+    migratedCount: number;
+    previousDimensions: number | null;
+    newDimensions: number;
+    tookMs: number;
+  }> {
+    const headers = await this.tokenManager.getAuthHeaders();
+    const res = await fetch(`${this.baseUrl}/v1/indexes/${encodeURIComponent(name)}/migrate-vectors`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(options),
+    });
+    if (!res.ok) throw new Error(`Migrate vectors failed: ${await res.text()}`);
+    const data = (await res.json()) as {
+      ok: boolean;
+      index: string;
+      migratedCount: number;
+      previousDimensions: number | null;
+      newDimensions: number;
+      tookMs: number;
+    };
+    return data;
+  }
 }

@@ -9,7 +9,7 @@ import { VectorStore, type VectorStoreSnapshot } from "./vector-store.js";
 import { blendScores, reciprocalRankFusion } from "./hybrid.js";
 import { assertGeoPoint, distanceFromOrigin, validateGeoQuery } from "./geo.js";
 import { localEmbed, textFromFields, meaningfulVectorHits } from "./embed.js";
-import { createEmbeddingAdapter, resolveEmbeddingDimensions } from "./embedding-adapters.js";
+import { createEmbeddingAdapter, resolveEmbeddingDimensions, type EmbeddingConfig } from "./embedding-adapters.js";
 import { globalCircuits } from "./circuit.js";
 import {
   coerceDocumentFields,
@@ -636,6 +636,90 @@ export class AnveshEngine {
     this.markDirty(indexName);
     await this.flush(indexName);
     return { deleted: ids.length };
+  }
+
+  /**
+   * Migrates vector embeddings for an existing index to new dimensions or a new embedding model.
+   * Recomputes embeddings for all indexed documents in batches, updates index definition,
+   * and persists the newly populated VectorStore.
+   */
+  async migrateIndexVectors(
+    indexName: string,
+    options?: {
+      dimensions?: number;
+      embeddingConfig?: EmbeddingConfig;
+      batchSize?: number;
+    },
+  ): Promise<{
+    ok: boolean;
+    index: string;
+    migratedCount: number;
+    previousDimensions: number | null;
+    newDimensions: number;
+    tookMs: number;
+  }> {
+    const started = performance.now();
+    const state = this.require(indexName);
+    const previousDimensions = state.definition.settings?.vectorDimensions ?? null;
+
+    const mergedConfig: EmbeddingConfig = {
+      ...state.definition.settings?.embeddingConfig,
+      ...options?.embeddingConfig,
+    };
+    const targetDimensions =
+      options?.dimensions ??
+      resolveEmbeddingDimensions(mergedConfig);
+
+    const adapter = createEmbeddingAdapter(mergedConfig);
+    const newVectorStore = new VectorStore(
+      targetDimensions,
+      state.definition.settings?.vectorMetric ?? "cosine",
+      state.definition.settings?.vectorIndexType ?? "flat",
+      state.definition.settings?.vectorQuantization ?? "none",
+    );
+
+    const docIds = state.inverted.listIds();
+    const batchSize = options?.batchSize || 100;
+    let migratedCount = 0;
+
+    for (let i = 0; i < docIds.length; i += batchSize) {
+      const batchIds = docIds.slice(i, i + batchSize);
+      const batchDocs = batchIds
+        .map((id) => state.inverted.get(id))
+        .filter((d): d is AnveshDocument => Boolean(d));
+
+      const texts = batchDocs.map((doc) => textFromFields(doc.fields));
+      const vectors = await adapter.embedBatch(texts, targetDimensions);
+
+      for (let j = 0; j < batchDocs.length; j++) {
+        const doc = batchDocs[j]!;
+        const vec = vectors[j]!;
+        doc.vector = vec;
+        newVectorStore.upsert(doc.id, vec);
+        migratedCount++;
+      }
+    }
+
+    state.vectors = newVectorStore;
+    state.definition.settings = {
+      ...state.definition.settings,
+      vectorDimensions: targetDimensions,
+      embeddingConfig: mergedConfig,
+    };
+    state.definition.updatedAt = new Date().toISOString();
+
+    this.markDirty(indexName);
+    await this.flush(indexName);
+
+    const tookMs = Math.round((performance.now() - started) * 100) / 100;
+    return {
+      ok: true,
+      index: indexName,
+      migratedCount,
+      previousDimensions,
+      newDimensions: targetDimensions,
+      tookMs,
+    };
   }
 
   async searchAsync(indexName: string, query: SearchQuery): Promise<SearchResult> {

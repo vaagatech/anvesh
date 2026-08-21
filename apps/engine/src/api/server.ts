@@ -454,6 +454,28 @@ export async function createAnveshApp(options: AnveshServerOptions = {}): Promis
     }
   });
 
+  app.post("/v1/indexes/:name/migrate-vectors", async (req, reply) => {
+    try {
+      const { name } = req.params as { name: string };
+      const body = (req.body as { dimensions?: number; embeddingConfig?: any; batchSize?: number }) || {};
+      const result = await engine.migrateIndexVectors(name, body);
+      return { message: `Migrated vectors for index "${name}".`, ...result };
+    } catch (err) {
+      return sendError(reply, err, req.requestId);
+    }
+  });
+
+  app.post("/v1/indexes/:name/_reindex", async (req, reply) => {
+    try {
+      const { name } = req.params as { name: string };
+      const body = (req.body as { dimensions?: number; embeddingConfig?: any; batchSize?: number }) || {};
+      const result = await engine.migrateIndexVectors(name, body);
+      return { message: `Reindexed and migrated vectors for index "${name}".`, ...result };
+    } catch (err) {
+      return sendError(reply, err, req.requestId);
+    }
+  });
+
   app.put("/v1/indexes/:name/documents/:id", async (req, reply) => {
     try {
       const { name, id } = req.params as { name: string; id: string };
