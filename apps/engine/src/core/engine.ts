@@ -206,6 +206,22 @@ export class AnveshEngine {
     return definition;
   }
 
+  updateMappings(name: string, mappings: Record<string, FieldMapping>): void {
+    const state = this.require(name);
+    state.definition.mappings = { ...state.definition.mappings, ...mappings };
+    state.definition.updatedAt = new Date().toISOString();
+    state.inverted.setMappings(state.definition.mappings);
+    this.markDirty(name);
+  }
+
+  updateSettings(name: string, settings: Partial<IndexSettings>): void {
+    const state = this.require(name);
+    state.definition.settings = { ...state.definition.settings, ...settings };
+    state.definition.updatedAt = new Date().toISOString();
+    state.inverted.setSettings(state.definition.settings);
+    this.markDirty(name);
+  }
+
   async deleteIndex(name: string): Promise<void> {
     this.require(name);
     this.indexes.delete(name);

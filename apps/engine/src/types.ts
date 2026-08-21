@@ -81,6 +81,17 @@ export interface IndexSettings {
    * Set false for strict schema-only indexes.
    */
   dynamicMapping?: boolean;
+  /**
+   * When true (default), enables non-AI visual color, motif & OCR feature extraction for documents with images.
+   * Set false to disable all visual processing.
+   */
+  enableVisualExtraction?: boolean;
+  /** When false, disables OCR text extraction specifically. Default true. */
+  ocrEnabled?: boolean;
+  /** When false, disables dominant color extraction. Default true. */
+  colorExtraction?: boolean;
+  /** When false, disables motif & pattern detection. Default true. */
+  motifExtraction?: boolean;
 }
 
 export interface IndexDefinition {

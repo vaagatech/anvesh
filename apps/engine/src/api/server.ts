@@ -10,6 +10,7 @@ import cors from "@fastify/cors";
 import rateLimit from "@fastify/rate-limit";
 import helmet from "@fastify/helmet";
 import { AnveshEngine } from "../core/engine.js";
+import { ConfigReconciler, type AnveshConfigSpec } from "../core/config-reconciler.js";
 import { globalCircuits } from "../core/circuit.js";
 import { AnveshError, apiEnvelope, formatMessage } from "../messaging/vaakly.js";
 import { globalDeadLetter, globalResourceGuard } from "@vaagatech/anvesh-shared";
@@ -336,6 +337,41 @@ export async function createAnveshApp(options: AnveshServerOptions = {}): Promis
       return { ok: true, status: "ready" };
     } catch {
       return reply.status(503).send({ ok: false, status: "not_ready" });
+    }
+  });
+
+  const reconciler = new ConfigReconciler(engine);
+
+  // ─── Declarative Config-as-Code Endpoints ─────────────────────────────────
+
+  app.get("/v1/config/export", async () => {
+    const config = reconciler.export();
+    return { ok: true, config };
+  });
+
+  app.post("/v1/config/plan", async (req, reply) => {
+    try {
+      const body = req.body as { config: AnveshConfigSpec; prune?: boolean };
+      if (!body || !body.config) {
+        return reply.status(400).send({ ok: false, message: "Missing required 'config' payload." });
+      }
+      const plan = await reconciler.plan(body.config, { prune: body.prune });
+      return { ok: true, plan };
+    } catch (err) {
+      return sendError(reply, err, req.requestId);
+    }
+  });
+
+  app.post("/v1/config/apply", async (req, reply) => {
+    try {
+      const body = req.body as { config: AnveshConfigSpec; prune?: boolean };
+      if (!body || !body.config) {
+        return reply.status(400).send({ ok: false, message: "Missing required 'config' payload." });
+      }
+      const result = await reconciler.apply(body.config, { prune: body.prune });
+      return reply.status(result.success ? 200 : 207).send({ ok: result.success, ...result });
+    } catch (err) {
+      return sendError(reply, err, req.requestId);
     }
   });
 

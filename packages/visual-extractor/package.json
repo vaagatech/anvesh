@@ -1,0 +1,28 @@
+{
+  "name": "@vaagatech/anvesh-visual-extractor",
+  "version": "0.4.0",
+  "description": "Non-AI OCR and Visual Feature Extractor for Anvesh Search Engine",
+  "author": "VaagaTech <support@vaagatech.com>",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "tesseract.js": "^5.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.7"
+  }
+}

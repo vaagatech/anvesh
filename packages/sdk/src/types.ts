@@ -1,0 +1,208 @@
+/**
+ * Anvesh SDK Types & Interfaces
+ */
+
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
+export type DocumentId = string;
+
+export interface AnveshDocument<T = Record<string, any>> {
+  id: DocumentId;
+  fields: Record<string, JsonValue>;
+  vector?: number[];
+  meta?: T;
+  updatedAt?: string;
+}
+
+export type FieldType =
+  | "text"
+  | "keyword"
+  | "number"
+  | "boolean"
+  | "date"
+  | "vector"
+  | "geo_point";
+
+export interface FieldMapping {
+  type: FieldType;
+  store?: boolean;
+  index?: boolean;
+  analyzer?: string;
+}
+
+export interface IndexSettings {
+  dynamicMapping?: boolean;
+  vectorDimensions?: number;
+  vectorMetric?: "cosine" | "dot_product" | "euclidean";
+  autoEmbed?: boolean;
+  hybridKeywordWeight?: number;
+  bm25k1?: number;
+  bm25b?: number;
+  enableVisualExtraction?: boolean;
+  ocrEnabled?: boolean;
+  colorExtraction?: boolean;
+  motifExtraction?: boolean;
+  [key: string]: any;
+}
+
+export interface IndexDefinition {
+  name: string;
+  mappings: Record<string, FieldMapping>;
+  settings?: IndexSettings;
+  createdAt: string;
+  updatedAt: string;
+  docCount: number;
+}
+
+export interface SearchQuery {
+  q?: string;
+  fields?: string[];
+  vector?: number[];
+  mode?: "keyword" | "semantic" | "hybrid" | "geo";
+  filters?: Array<{ field: string; value: any }>;
+  from?: number;
+  size?: number;
+  highlight?: boolean;
+  minScore?: number;
+  boosts?: Record<string, number>;
+  [key: string]: any;
+}
+
+export interface SearchHit<T = Record<string, any>> {
+  id: DocumentId;
+  score: number;
+  source: AnveshDocument<T>;
+  highlight?: Record<string, string[]>;
+  distanceKm?: number;
+}
+
+export interface SearchResult<T = Record<string, any>> {
+  ok: boolean;
+  total: number;
+  tookMs: number;
+  hits: SearchHit<T>[];
+  message?: string;
+  facets?: Record<string, any>;
+}
+
+export interface BulkIndexItem {
+  action: "index" | "delete";
+  id: DocumentId;
+  fields?: Record<string, JsonValue>;
+  meta?: Record<string, JsonValue>;
+}
+
+export interface BulkIndexResult {
+  indexed: number;
+  failed: number;
+  errors?: Array<{ id: DocumentId; error: string }>;
+}
+
+export interface SpiderCrawlRequest {
+  startUrls: string[];
+  allowedDomains?: string[];
+  maxPages?: number;
+  maxDepth?: number;
+  targetIndex?: string;
+  scheduleCron?: string;
+}
+
+export interface SpiderJob {
+  id: string;
+  status: "queued" | "running" | "completed" | "failed" | "cancelled";
+  targetIndex: string;
+  pagesCrawled: number;
+  documentsIndexed: number;
+  createdAt: string;
+  updatedAt: string;
+  error?: string;
+}
+
+export interface AnveshConfigSpec {
+  version?: string;
+  indexes?: Array<{
+    name: string;
+    mappings?: Record<string, FieldMapping>;
+    settings?: IndexSettings;
+    aliases?: string[];
+  }>;
+  spiderTargets?: Array<{
+    name: string;
+    targetUrl: string;
+    indexName: string;
+    maxDepth?: number;
+    maxPages?: number;
+    allowedDomains?: string[];
+    scheduleCron?: string;
+  }>;
+  circuits?: {
+    maxBodyBytes?: number;
+    maxBulkDocs?: number;
+    maxConcurrentSearch?: number;
+    maxResultWindow?: number;
+    maxRssMb?: number;
+    maxDocsPerIndex?: number;
+    maxFuzzyCandidates?: number;
+  };
+}
+
+export interface ConfigPlanResult {
+  actions: Array<{
+    type: string;
+    target: string;
+    details: Record<string, unknown>;
+  }>;
+  hasChanges: boolean;
+}
+
+export interface ConfigApplyResult {
+  applied: Array<{
+    type: string;
+    target: string;
+    details: Record<string, unknown>;
+  }>;
+  errors: Array<{ target: string; error: string }>;
+  success: boolean;
+}
+
+export interface OcrResult {
+  text: string;
+  confidence: number;
+  lines: string[];
+  words: string[];
+}
+
+export interface VisualExtractionResult {
+  ocr: OcrResult;
+  colors: {
+    dominant: string[];
+    palette: Array<{ name: string; percentage: number }>;
+  };
+  motifs: {
+    motifs: string[];
+    textureType: string;
+    edgeDensity: number;
+    patternKeywords: string[];
+  };
+  searchableText: string;
+  tags: string[];
+}
+
+export interface AnveshClientOptions {
+  baseUrl: string;
+  apiKey?: string;
+  m2m?: {
+    clientId: string;
+    clientSecret: string;
+    tokenUrl: string;
+    scope?: string;
+  };
+  timeoutMs?: number;
+  retries?: number;
+}

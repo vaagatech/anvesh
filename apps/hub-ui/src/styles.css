@@ -407,6 +407,11 @@ pre code {
 }
 
 /* Stat Cards */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.25rem;
+}
 .stat-card {
   background: var(--c-bg-mute);
   border: 1px solid var(--c-border);

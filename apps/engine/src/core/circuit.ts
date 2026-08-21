@@ -32,6 +32,14 @@ export class CircuitBreakers {
     return { ...this.limits };
   }
 
+  getLimits() {
+    return { ...this.limits };
+  }
+
+  setLimits(newLimits: Partial<typeof this.limits>) {
+    Object.assign(this.limits, newLimits);
+  }
+
   checkBulkSize(count: number): void {
     if (count > this.limits.maxBulkDocs) {
       this.tripped.bulk! += 1;

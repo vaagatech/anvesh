@@ -1,0 +1,24 @@
+{
+  "name": "@vaagatech/anvesh-sdk",
+  "version": "0.4.0",
+  "description": "Official TypeScript & JavaScript Client SDK for Anvesh Search Engine",
+  "author": "VaagaTech <support@vaagatech.com>",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "vitest": "^3.0.7"
+  }
+}

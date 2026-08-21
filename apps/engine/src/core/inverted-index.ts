@@ -49,9 +49,17 @@ export class InvertedIndex {
   docCount = 0;
 
   constructor(
-    private readonly mappings: Record<string, FieldMapping>,
-    private readonly settings: IndexSettings = {},
+    private mappings: Record<string, FieldMapping>,
+    private settings: IndexSettings = {},
   ) {}
+
+  setMappings(mappings: Record<string, FieldMapping>): void {
+    this.mappings = mappings;
+  }
+
+  setSettings(settings: IndexSettings): void {
+    this.settings = settings;
+  }
 
   has(id: DocumentId): boolean {
     return this.documents.has(id);
