@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Anvesh — Cloud-Native Search Engine & Vector Database</title>
-  <meta name="description" content="Ultra-lightweight search engine & vector database. Sub-millisecond queries, 85% lower TCO, tiered S3/OCI storage, zero-drop reliability.">
+  <meta name="description" content="Ultra-lightweight search engine & vector database. Sub-millisecond queries, non-AI visual/OCR extraction, TypeScript SDK, GitOps config-as-code, 85% lower TCO.">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -25,6 +25,8 @@
       </a>
       <div class="topnav-right">
         <a class="topnav-link" href="getting-started.html">Docs</a>
+        <a class="topnav-link" href="features.html">Features</a>
+        <a class="topnav-link" href="architecture.html">Architecture</a>
         <button class="theme-btn" id="themeToggle" aria-label="Toggle theme">
           <svg id="sunIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
           <svg id="moonIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
@@ -41,10 +43,10 @@
   <!-- ── Hero ───────────────────────────────────────────────────────── -->
   <main id="main-content">
     <section class="landing-hero">
-      <h1>Cloud-Native Search <br>for the <span class="highlight">Modern Stack</span></h1>
+      <h1>Cloud-Native Search & Vectors <br>for the <span class="highlight">Modern Stack</span></h1>
       <p class="lead">
-        Sub-millisecond full-text & vector search, 85% lower infrastructure costs,
-        and zero-drop reliability — all in a sub-100 MB binary.
+        Sub-millisecond hybrid BM25 + vector search, non-AI visual/OCR feature extraction, GitOps declarative schema sync, 
+        and 3-tier concurrency throttling — all in an ultra-lightweight Node.js engine.
       </p>
       <div class="hero-actions">
         <a class="hero-btn hero-btn--primary" href="getting-started.html">🚀 Get Started</a>
@@ -63,55 +65,91 @@
         <div class="metric-label">Lower TCO</div>
       </div>
       <div class="metric">
-        <div class="metric-val">~80MB</div>
+        <div class="metric-val">~70MB</div>
         <div class="metric-label">Memory Footprint</div>
       </div>
       <div class="metric">
         <div class="metric-val">0</div>
-        <div class="metric-label">Documents Lost</div>
+        <div class="metric-label">Documents Lost (DLQ)</div>
       </div>
     </div>
 
     <!-- ── Features ─────────────────────────────────────────────────── -->
     <section class="features-section">
       <div class="section-label">Capabilities</div>
-      <h2 class="section-title">Everything you need for search</h2>
+      <h2 class="section-title">Everything you need for enterprise search</h2>
       <p class="section-desc">
-        Full-text BM25, dense vector retrieval, hybrid ranking, geo-indexing,
-        and enterprise-grade reliability — in one lightweight package.
+        Full-text BM25, dense vector retrieval, non-AI OCR & visual extraction, GitOps declarative schemas,
+        and multi-layered concurrency protections.
       </p>
       <div class="feature-grid">
         <div class="feature-card">
           <h3>⚡ Hybrid Search</h3>
-          <p>BM25 full-text + dense vector semantic search with reciprocal rank fusion. One API, both modalities.</p>
+          <p>BM25 full-text + dense vector semantic search with reciprocal rank fusion (RRF) and semantic synonym highlights.</p>
+        </div>
+        <div class="feature-card">
+          <h3>🎨 Non-AI Visual & OCR</h3>
+          <p>Local pure-CPU OCR text recognition, textile color palette matching, and motif/pattern edge descriptors without external AI models.</p>
+        </div>
+        <div class="feature-card">
+          <h3>⚙️ Config-as-Code & GitOps</h3>
+          <p>Declarative schema evolution and drift detection via <code>anvesh plan</code>, <code>anvesh apply</code>, or Terraform without restarting pods.</p>
+        </div>
+        <div class="feature-card">
+          <h3>🛡️ 3-Tier Protective Throttling</h3>
+          <p>Rate limiting (RPM), in-flight concurrent query slot caps, and proactive 85% heap backpressure guards against runaway loads.</p>
         </div>
         <div class="feature-card">
           <h3>🗄️ Tiered Storage</h3>
-          <p>Hot data on NVMe, warm segments auto-offloaded to S3 or OCI Object Storage. Pay only for what you query.</p>
+          <p>Hot data in-memory, warm segments auto-offloaded to S3 or OCI Object Storage with immutable segment blocks.</p>
         </div>
         <div class="feature-card">
-          <h3>🔒 Dead-Letter Queue</h3>
-          <p>Zero-document-loss guarantee. Every failed write is captured, retried, and reconciled automatically.</p>
+          <h3>🔒 Zero-Drop DLQ</h3>
+          <p>Zero-document-loss guarantee. Every failed write is captured in an isolated DLQ with automated retries and one-click replay.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── SDK & CLI Preview ─────────────────────────────────────────── -->
+    <section class="features-section" style="padding-top: 0;">
+      <div class="section-label">Developer First</div>
+      <h2 class="section-title">Programmatic SDK & CLI Tooling</h2>
+      <div class="feature-grid" style="grid-template-columns: 1fr 1fr;">
+        <div class="feature-card">
+          <h3>📦 TypeScript SDK</h3>
+          <pre style="background:var(--card-bg); padding:1rem; border-radius:8px; overflow-x:auto;"><code>import { AnveshClient } from "@vaagatech/anvesh-sdk";
+
+const client = new AnveshClient({
+  baseUrl: "https://api.search.example.com",
+  apiKey: process.env.ANVESH_API_KEY,
+});
+
+const results = await client.search("products", {
+  q: "festive silk saree with elephant",
+  mode: "hybrid",
+});</code></pre>
         </div>
         <div class="feature-card">
-          <h3>🌍 Geo Search</h3>
-          <p>Native geo-point indexing with radius, bounding-box, and polygon filters — no plugins required.</p>
-        </div>
-        <div class="feature-card">
-          <h3>📊 Real-time Analytics</h3>
-          <p>Built-in aggregation framework: terms, histograms, date ranges, and nested facets at query time.</p>
-        </div>
-        <div class="feature-card">
-          <h3>☁️ Cloud-Native</h3>
-          <p>Single Go binary. Docker, K8s, or bare-metal. ARM64 and AMD64. Deploy in seconds, not hours.</p>
+          <h3>💻 Anvesh CLI & GitOps</h3>
+          <pre style="background:var(--card-bg); padding:1rem; border-radius:8px; overflow-x:auto;"><code># Initialize declarative config
+anvesh init
+
+# Detect drift vs live cluster
+anvesh plan -f anvesh.config.json
+
+# Apply schema without restarts
+anvesh apply -f anvesh.config.json
+
+# Run instant hybrid search
+anvesh search products -q "saree"</code></pre>
         </div>
       </div>
     </section>
 
     <!-- ── CTA Banner ───────────────────────────────────────────────── -->
     <section class="cta-banner">
-      <h2>Ready to replace Elasticsearch?</h2>
-      <p>Anvesh gives you the same capabilities at a fraction of the cost and complexity.</p>
+      <h2>Ready to replace complex search clusters?</h2>
+      <p>Anvesh gives you enterprise search & vector DB capabilities with instant GitOps and a fraction of the cost.</p>
       <a class="cta-btn" href="getting-started.html">Read the Docs →</a>
     </section>
   </main>

@@ -19,6 +19,8 @@
     <a class="topnav-brand" href="index.html"><img src="assets/images/anvesh-logo.svg" alt="Anvesh"></a>
     <div class="topnav-right">
       <a class="topnav-link" href="getting-started.html">Docs</a>
+      <a class="topnav-link" href="features.html">Features</a>
+      <a class="topnav-link" href="architecture.html">Architecture</a>
       <button class="theme-btn" id="themeToggle" aria-label="Toggle theme"><svg id="sunIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg><svg id="moonIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
       <a class="topnav-btn topnav-btn--ghost" href="https://github.com/vaagatech/anvesh" target="_blank" rel="noopener noreferrer"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg> GitHub</a>
       <a class="topnav-btn topnav-btn--primary" href="getting-started.html">Get Started →</a>
@@ -51,43 +53,36 @@
           </thead>
           <tbody>
             <tr><td><strong>Full-text search (BM25)</strong></td><td class="col-anvesh">✅</td><td>✅</td><td>❌</td><td>✅</td></tr>
-            <tr><td><strong>Dense vector search</strong></td><td class="col-anvesh">✅</td><td>✅ (8.x+)</td><td>✅</td><td>❌</td></tr>
-            <tr><td><strong>Hybrid BM25 + vector</strong></td><td class="col-anvesh">✅</td><td>⚠️ Manual</td><td>❌</td><td>❌</td></tr>
+            <tr><td><strong>Dense vector search</strong></td><td class="col-anvesh">✅ (SQ8)</td><td>✅ (8.x+)</td><td>✅</td><td>❌</td></tr>
+            <tr><td><strong>Hybrid BM25 + Vector (RRF)</strong></td><td class="col-anvesh">✅ Native</td><td>⚠️ Manual</td><td>❌</td><td>❌</td></tr>
+            <tr><td><strong>Non-AI OCR & Visual Extractor</strong></td><td class="col-anvesh">✅ Built-in</td><td>❌</td><td>❌</td><td>❌</td></tr>
+            <tr><td><strong>GitOps Config-as-Code</strong></td><td class="col-anvesh">✅ Plan & Apply</td><td>❌</td><td>❌</td><td>❌</td></tr>
+            <tr><td><strong>3-Tier Throttling & Circuits</strong></td><td class="col-anvesh">✅ Built-in</td><td>⚠️ Complex</td><td>N/A</td><td>❌</td></tr>
             <tr><td><strong>Geo-spatial queries</strong></td><td class="col-anvesh">✅</td><td>✅</td><td>❌</td><td>✅</td></tr>
-            <tr><td><strong>Tiered object storage</strong></td><td class="col-anvesh">✅</td><td>⚠️ Snapshot only</td><td>N/A</td><td>❌</td></tr>
-            <tr><td><strong>Dead-letter queue</strong></td><td class="col-anvesh">✅</td><td>❌</td><td>N/A</td><td>❌</td></tr>
-            <tr><td><strong>Web crawler built-in</strong></td><td class="col-anvesh">✅</td><td>❌</td><td>❌</td><td>❌</td></tr>
-            <tr><td><strong>Memory per 1M docs</strong></td><td class="col-anvesh">~80 MB</td><td>~8 GB</td><td>N/A (managed)</td><td>~2 GB</td></tr>
-            <tr><td><strong>Self-hosted</strong></td><td class="col-anvesh">✅</td><td>✅</td><td>❌</td><td>✅</td></tr>
-            <tr><td><strong>ARM64 native</strong></td><td class="col-anvesh">✅</td><td>✅ (7.x+)</td><td>N/A</td><td>✅</td></tr>
-            <tr><td><strong>License</strong></td><td class="col-anvesh">Proprietary</td><td>SSPL/Elastic</td><td>Proprietary SaaS</td><td>MIT</td></tr>
+            <tr><td><strong>Tiered object storage</strong></td><td class="col-anvesh">✅ Hot/Warm/Cold</td><td>⚠️ Snapshot only</td><td>N/A</td><td>❌</td></tr>
+            <tr><td><strong>Dead-letter queue (DLQ)</strong></td><td class="col-anvesh">✅ Zero-drop</td><td>❌</td><td>N/A</td><td>❌</td></tr>
+            <tr><td><strong>Memory per 1M docs</strong></td><td class="col-anvesh">~70 MB</td><td>~8 GB</td><td>N/A (managed)</td><td>~2 GB</td></tr>
+            <tr><td><strong>Official TypeScript SDK & CLI</strong></td><td class="col-anvesh">✅</td><td>✅</td><td>✅</td><td>✅</td></tr>
+            <tr><td><strong>License</strong></td><td class="col-anvesh">MIT / Open</td><td>SSPL/Elastic</td><td>Proprietary SaaS</td><td>MIT</td></tr>
           </tbody>
         </table>
 
         <h2>When to Choose Anvesh</h2>
         <ul>
-          <li><strong>Cost-sensitive workloads</strong> — you need search but can't justify $5K+/month</li>
-          <li><strong>Hybrid search</strong> — you need both BM25 text and vector similarity in one system</li>
-          <li><strong>Edge/IoT</strong> — you need search on resource-constrained hardware (ARM, limited RAM)</li>
-          <li><strong>Data sovereignty</strong> — you must self-host and control your data</li>
-          <li><strong>Startup velocity</strong> — deploy in 60 seconds, not 6 hours</li>
-        </ul>
-
-        <h2>When NOT to Choose Anvesh</h2>
-        <ul>
-          <li><strong>Elasticsearch ecosystem</strong> — you need Kibana dashboards, Logstash pipelines, or Elastic APM</li>
-          <li><strong>Petabyte scale</strong> — you have 100+ nodes and need Elastic's mature cluster management</li>
-          <li><strong>Fully managed only</strong> — you want a SaaS service with zero ops (consider Elastic Cloud or Pinecone)</li>
+          <li><strong>Cost-sensitive workloads</strong> — need high-throughput hybrid search without multi-thousand dollar cloud bills</li>
+          <li><strong>Multimodal eCommerce & Retail</strong> — automatic OCR and color/motif extraction for products like sarees, apparel, and catalogs</li>
+          <li><strong>GitOps & Infrastructure-as-Code</strong> — manage indexes and crawler targets cleanly via Terraform or <code>anvesh apply</code></li>
+          <li><strong>Edge, K3s, and Microservice stacks</strong> — ultra-lightweight Node.js footprint (~70MB idle RAM)</li>
         </ul>
 
         <h2>Latency Comparison</h2>
         <table>
           <thead><tr><th>Engine</th><th>p50 Latency</th><th>p99 Latency</th><th>Conditions</th></tr></thead>
           <tbody>
-            <tr><td class="col-anvesh"><strong>Anvesh</strong></td><td class="col-anvesh">0.3 ms</td><td class="col-anvesh">0.8 ms</td><td class="col-anvesh">1M docs, single node</td></tr>
-            <tr><td><strong>Elasticsearch</strong></td><td>5–15 ms</td><td>50–100 ms</td><td>1M docs, 3-node cluster</td></tr>
-            <tr><td><strong>Meilisearch</strong></td><td>2–5 ms</td><td>10–20 ms</td><td>1M docs, single node</td></tr>
-            <tr><td><strong>Typesense</strong></td><td>1–3 ms</td><td>5–10 ms</td><td>1M docs, single node</td></tr>
+            <tr><td class="col-anvesh"><strong>Anvesh</strong></td><td class="col-anvesh">0.3 ms</td><td class="col-anvesh">0.8 ms</td><td class="col-anvesh">100K docs, BM25 + Vector Hybrid</td></tr>
+            <tr><td><strong>Elasticsearch</strong></td><td>5–15 ms</td><td>50–100 ms</td><td>100K docs, 3-node cluster</td></tr>
+            <tr><td><strong>Meilisearch</strong></td><td>2–5 ms</td><td>10–20 ms</td><td>100K docs, single node</td></tr>
+            <tr><td><strong>Typesense</strong></td><td>1–3 ms</td><td>5–10 ms</td><td>100K docs, single node</td></tr>
           </tbody>
         </table>
       </div>

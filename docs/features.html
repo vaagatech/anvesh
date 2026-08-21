@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Features & Capabilities · Anvesh Docs</title>
-  <meta name="description" content="Full-text BM25, dense vector search, hybrid rank fusion, geo-indexing, dead-letter reliability, and tiered storage.">
+  <meta name="description" content="Full-text BM25, dense vector search, non-AI OCR & visual extraction, GitOps config-as-code, 3-tier throttling, dead-letter reliability, and tiered storage.">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -19,6 +19,8 @@
     <a class="topnav-brand" href="index.html"><img src="assets/images/anvesh-logo.svg" alt="Anvesh"></a>
     <div class="topnav-right">
       <a class="topnav-link" href="getting-started.html">Docs</a>
+      <a class="topnav-link" href="features.html">Features</a>
+      <a class="topnav-link" href="architecture.html">Architecture</a>
       <button class="theme-btn" id="themeToggle" aria-label="Toggle theme"><svg id="sunIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg><svg id="moonIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
       <a class="topnav-btn topnav-btn--ghost" href="https://github.com/vaagatech/anvesh" target="_blank" rel="noopener noreferrer"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg> GitHub</a>
       <a class="topnav-btn topnav-btn--primary" href="getting-started.html">Get Started →</a>
@@ -35,72 +37,72 @@
     <main class="docs-main" id="main-content">
       <div class="page-label">Platform</div>
       <h1 class="page-title">Features & Capabilities</h1>
-      <p class="page-desc">Full-text BM25, dense vector retrieval, hybrid rank fusion, geo-indexing, dead-letter reliability, and tiered object storage.</p>
+      <p class="page-desc">Full-text BM25, dense vector retrieval, non-AI OCR & visual extraction, GitOps declarative schema sync, 3-tier throttling, dead-letter reliability, and tiered storage.</p>
 
       <div class="prose">
-        <h2>Hybrid Search Engine</h2>
-        <p>Anvesh combines BM25 full-text scoring with dense vector similarity search using <strong>Reciprocal Rank Fusion (RRF)</strong>. A single query returns results that are both lexically and semantically relevant — no separate systems required.</p>
+        <h2>Hybrid Search Engine & Semantic Highlights</h2>
+        <p>Anvesh combines BM25 full-text scoring with dense vector similarity search using <strong>Reciprocal Rank Fusion (RRF)</strong>. A single query returns results that are both lexically and semantically relevant:</p>
         <ul>
           <li><strong>BM25 Full-Text</strong> — inverted index with configurable tokenizers, stemming, and stop-word filters</li>
-          <li><strong>Dense Vector (HNSW)</strong> — approximate nearest neighbor using hierarchical navigable small world graphs</li>
-          <li><strong>Hybrid mode</strong> — fuse both signals via RRF with configurable <code>alpha</code> weighting</li>
+          <li><strong>Dense Vector (HNSW & SQ8)</strong> — approximate nearest neighbor with 75% vector memory compression</li>
+          <li><strong>Hybrid Mode</strong> — fuse keyword + semantic signals via RRF or linear score blending</li>
+          <li><strong>Bounded Highlighting</strong> — strict 240-character snippet truncation at sentence boundaries with semantic synonym expansion</li>
+        </ul>
+
+        <h2>Non-AI Visual & OCR Feature Extractor</h2>
+        <p>Convert images, product photos, saree weaves, and scanned PDFs into searchable text without expensive external AI APIs:</p>
+        <ul>
+          <li><strong>Pure-CPU Local OCR</strong> — embedded <code>tesseract.js</code> worker recognizes printed words, tags, and product serials</li>
+          <li><strong>Textile Color Palette Analyzer</strong> — matches pixel histograms to a curated dictionary (<code>"Gold Zari"</code>, <code>"Royal Blue"</code>, <code>"Maroon"</code>, <code>"Emerald Green"</code>)</li>
+          <li><strong>Motif & Texture Edge Descriptor</strong> — uses gradient frequency and edge density to classify patterns (<code>"Elephant Motif"</code>, <code>"Temple Border"</code>, <code>"Kattam Checks"</code>)</li>
+        </ul>
+
+        <h2>Config-as-Code & GitOps Automation</h2>
+        <p>Manage all search infrastructure through code and version control:</p>
+        <ul>
+          <li><strong>Declarative Plan & Apply</strong> — run <code>anvesh plan</code> and <code>anvesh apply</code> to evolve schemas without pod restarts</li>
+          <li><strong>Terraform Provider</strong> — provision and manage indexes, crawlers, and circuit breakers in <code>.tf</code> files</li>
+          <li><strong>Official Client SDK</strong> — fully typed TypeScript/JavaScript client (<code>@vaagatech/anvesh-sdk</code>) with automated Cognito M2M token rotation</li>
+        </ul>
+
+        <h2>3-Tier Protective Throttling & Circuit Breakers</h2>
+        <p>Built-in defenses to prevent denial-of-service, CPU spin, and out-of-memory crashes:</p>
+        <ul>
+          <li><strong>Tier 1: Rate Limiting</strong> — per-token/IP rate limits (default 120 req/min, configurable via <code>ANVESH_RATE_LIMIT</code>)</li>
+          <li><strong>Tier 2: In-Flight Slot Limits</strong> — caps simultaneous executing searches (default 32 concurrent, configurable via <code>ANVESH_MAX_CONCURRENT_SEARCH</code>) with instant <code>429 ERR_CIRCUIT_CONCURRENT</code> shedding</li>
+          <li><strong>Tier 3: Memory Backpressure</strong> — proactive GC at 75% heap; automatic load-shedding at 85% heap to prevent OOM restarts</li>
         </ul>
 
         <h2>Tiered Object Storage</h2>
-        <p>Anvesh automatically tiers data between fast local NVMe and cheap object storage:</p>
+        <p>Anvesh automatically tiers data between fast in-memory segments and cheap cloud storage:</p>
         <ul>
-          <li><strong>Hot tier</strong> — NVMe/SSD for frequently accessed segments</li>
-          <li><strong>Warm tier</strong> — S3, OCI Object Storage, or MinIO for infrequently accessed data</li>
-          <li><strong>Automatic promotion</strong> — segments are pulled to hot tier on query demand</li>
+          <li><strong>Hot tier</strong> — in-memory and local SSD for frequently accessed segments</li>
+          <li><strong>Warm/Cold tier</strong> — S3, OCI Object Storage, or MinIO for immutable historical segments</li>
+          <li><strong>Cost impact</strong> — reduces cluster operational costs by up to 85% compared to monolithic search nodes</li>
         </ul>
-
-        <div class="callout">
-          <strong>Cost impact:</strong> Tiered storage alone can reduce infrastructure costs by 60–70% compared to keeping all data on hot storage.
-        </div>
 
         <h2>Dead-Letter Queue (DLQ)</h2>
-        <p>Every failed indexing operation is captured in a durable Dead-Letter Queue. The DLQ provides:</p>
+        <p>Every failed write or corrupted document is captured in a zero-drop Dead-Letter Queue:</p>
         <ul>
           <li>Automatic retry with exponential backoff</li>
-          <li>Manual inspection and replay via the Hub UI</li>
-          <li>Metrics and alerting on DLQ depth</li>
+          <li>Manual inspection and one-click replay via the Hub UI</li>
           <li><strong>Zero-document-loss guarantee</strong></li>
         </ul>
-
-        <h2>Geo-Spatial Search</h2>
-        <p>Native geo-point indexing with support for:</p>
-        <ul>
-          <li>Radius queries (within <em>N</em> km of a point)</li>
-          <li>Bounding-box filters</li>
-          <li>Polygon containment checks</li>
-          <li>Sort by distance</li>
-        </ul>
-
-        <h2>Real-Time Aggregations</h2>
-        <p>Built-in aggregation framework that runs at query time:</p>
-        <ul>
-          <li><strong>Terms</strong> — top-K value counts</li>
-          <li><strong>Histogram</strong> — numeric bucket distributions</li>
-          <li><strong>Date ranges</strong> — temporal groupings</li>
-          <li><strong>Nested facets</strong> — multi-level drill-down</li>
-        </ul>
-
-        <h2>Deployment Flexibility</h2>
-        <p>Single Go binary. No JVM. No heavy dependencies. Runs on:</p>
-        <table>
-          <thead><tr><th>Platform</th><th>Status</th></tr></thead>
-          <tbody>
-            <tr><td><strong>Docker / Docker Compose</strong></td><td>✅ Production ready</td></tr>
-            <tr><td><strong>Kubernetes / K3s</strong></td><td>✅ Helm chart included</td></tr>
-            <tr><td><strong>Bare metal</strong></td><td>✅ Single binary</td></tr>
-            <tr><td><strong>ARM64 / AMD64</strong></td><td>✅ Multi-arch images</td></tr>
-          </tbody>
-        </table>
       </div>
     </main>
   </div>
 
-  <footer class="site-footer"><p>© <script>document.write(new Date().getFullYear())</script> VaagaTech · <a href="https://github.com/vaagatech/anvesh">GitHub</a></p></footer>
-  <script>(function(){const b=document.getElementById('themeToggle'),s=document.getElementById('sunIcon'),m=document.getElementById('moonIcon');function a(t){document.documentElement.setAttribute('data-theme',t);localStorage.setItem('anvesh-theme',t);s.style.display=t==='dark'?'block':'none';m.style.display=t==='dark'?'none':'block';}a(localStorage.getItem('anvesh-theme')||'light');b.addEventListener('click',function(){a(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark');});})();</script>
+  <footer class="site-footer">
+    <p>© <script>document.write(new Date().getFullYear())</script> VaagaTech · <a href="https://github.com/vaagatech/anvesh">GitHub</a></p>
+  </footer>
+
+  <script>
+    (function(){
+      const btn=document.getElementById('themeToggle'),sun=document.getElementById('sunIcon'),moon=document.getElementById('moonIcon');
+      function apply(t){document.documentElement.setAttribute('data-theme',t);localStorage.setItem('anvesh-theme',t);sun.style.display=t==='dark'?'block':'none';moon.style.display=t==='dark'?'none':'block';}
+      apply(localStorage.getItem('anvesh-theme')||'light');
+      btn.addEventListener('click',function(){apply(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark');});
+    })();
+  </script>
 </body>
 </html>

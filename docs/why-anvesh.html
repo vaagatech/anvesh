@@ -19,6 +19,8 @@
     <a class="topnav-brand" href="index.html"><img src="assets/images/anvesh-logo.svg" alt="Anvesh"></a>
     <div class="topnav-right">
       <a class="topnav-link" href="getting-started.html">Docs</a>
+      <a class="topnav-link" href="features.html">Features</a>
+      <a class="topnav-link" href="architecture.html">Architecture</a>
       <button class="theme-btn" id="themeToggle" aria-label="Toggle theme"><svg id="sunIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg><svg id="moonIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
       <a class="topnav-btn topnav-btn--ghost" href="https://github.com/vaagatech/anvesh" target="_blank" rel="noopener noreferrer"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg> GitHub</a>
       <a class="topnav-btn topnav-btn--primary" href="getting-started.html">Get Started →</a>
@@ -35,7 +37,7 @@
     <main class="docs-main" id="main-content">
       <div class="page-label">Business Case</div>
       <h1 class="page-title">Why Anvesh — TCO & ROI</h1>
-      <p class="page-desc">How Anvesh delivers 85% lower total cost of ownership while matching Elasticsearch and Pinecone on features.</p>
+      <p class="page-desc">How Anvesh delivers 85% lower total cost of ownership while matching Elasticsearch and Pinecone on capabilities.</p>
 
       <div class="prose">
         <h2>The Problem with Existing Solutions</h2>
@@ -44,7 +46,7 @@
           <li><strong>Elasticsearch</strong> requires 32–64 GB JVM heaps per node, driving massive RAM costs</li>
           <li><strong>Pinecone / Weaviate</strong> charge $0.10+ per 1M vectors/month with vendor lock-in</li>
           <li><strong>Solr</strong> demands a full JVM stack and ZooKeeper coordination overhead</li>
-          <li>Separate systems needed for text search and vector search — double the ops burden</li>
+          <li>Separate systems needed for text search, vector retrieval, and image OCR — multiple ops burdens</li>
         </ul>
 
         <h2>Anvesh Cost Advantage</h2>
@@ -52,45 +54,33 @@
           <thead><tr><th>Cost Component</th><th>Elasticsearch (3-node)</th><th>Anvesh (3-node)</th><th>Savings</th></tr></thead>
           <tbody>
             <tr><td><strong>Compute (monthly)</strong></td><td>$1,440 (r6g.xlarge × 3)</td><td>$180 (A1.Flex 2-OCPU × 3)</td><td>87%</td></tr>
-            <tr><td><strong>Storage (1 TB)</strong></td><td>$230 (gp3 SSD)</td><td>$23 (OCI Object Storage)</td><td>90%</td></tr>
+            <tr><td><strong>Storage (1 TB)</strong></td><td>$230 (gp3 SSD)</td><td>$23 (OCI / S3 Object Storage)</td><td>90%</td></tr>
             <tr><td><strong>Data transfer</strong></td><td>$90</td><td>$0 (OCI free egress)</td><td>100%</td></tr>
             <tr><td><strong>Operations FTE</strong></td><td>0.5 FTE ($5K/mo)</td><td>0.1 FTE ($1K/mo)</td><td>80%</td></tr>
             <tr><td><strong>Total monthly</strong></td><td><strong>$6,760</strong></td><td><strong>$1,203</strong></td><td><strong>82%</strong></td></tr>
           </tbody>
         </table>
 
-        <div class="callout">
-          <strong>Real-world result:</strong> A mid-size SaaS company migrated from a 3-node Elasticsearch cluster to Anvesh on OCI ARM64 and reduced their search infrastructure bill from $81K/year to $14K/year — an 83% reduction.
-        </div>
-
-        <h2>Why It's Cheaper</h2>
+        <h2>Why It's Cheaper & Faster</h2>
         <ul>
-          <li><strong>No JVM overhead</strong> — Go binary uses ~80 MB RAM vs 32+ GB for Elasticsearch</li>
+          <li><strong>No JVM overhead</strong> — Node.js microservices use ~70 MB RAM vs 32+ GB for Elasticsearch</li>
+          <li><strong>SQ8 Vector Quantization</strong> — 75% vector memory compression with >98% recall accuracy</li>
           <li><strong>ARM64 native</strong> — runs on Ampere A1 instances at 1/3 the cost of x86</li>
           <li><strong>Tiered storage</strong> — cold data on $0.023/GB object storage, not $0.10/GB SSD</li>
-          <li><strong>Single binary</strong> — no ZooKeeper, no Logstash, no Kibana licensing</li>
-          <li><strong>OCI Free Tier</strong> — 4 ARM cores + 24 GB RAM permanently free</li>
+          <li><strong>GitOps Config-as-Code</strong> — automate index updates via CLI or Terraform with zero pod restarts</li>
         </ul>
 
         <h2>Feature Parity</h2>
-        <p>Anvesh isn't just cheaper — it matches or exceeds on capabilities:</p>
+        <p>Anvesh matches or exceeds heavy search stacks:</p>
         <ul>
-          <li>✅ Full-text BM25 + dense vector hybrid search</li>
+          <li>✅ Full-text BM25 + dense vector hybrid search (RRF)</li>
+          <li>✅ Built-in non-AI OCR, color palette & motif extraction</li>
           <li>✅ Real-time aggregations and faceting</li>
-          <li>✅ Geo-spatial queries</li>
-          <li>✅ Zero-document-loss DLQ (Elasticsearch has no built-in equivalent)</li>
+          <li>✅ 3-tier protective throttling & concurrency slots</li>
+          <li>✅ Zero-document-loss DLQ</li>
           <li>✅ Built-in web crawler (Spider)</li>
-          <li>✅ Tiered object storage (only available via Elasticsearch S3 snapshot, not live queries)</li>
+          <li>✅ Declarative Config-as-Code & TypeScript SDK</li>
         </ul>
-
-        <h2>Migration Path</h2>
-        <ol>
-          <li><strong>Deploy Anvesh</strong> alongside existing Elasticsearch cluster</li>
-          <li><strong>Mirror writes</strong> — send index operations to both systems</li>
-          <li><strong>Validate</strong> — compare search results, latency, and relevance</li>
-          <li><strong>Cut over</strong> — switch read traffic to Anvesh</li>
-          <li><strong>Decommission</strong> — shut down Elasticsearch nodes</li>
-        </ol>
       </div>
     </main>
   </div>

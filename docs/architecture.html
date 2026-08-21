@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Architecture · Anvesh Docs</title>
-  <meta name="description" content="Distributed topology, shard replication, segment management, and cluster coordination in Anvesh.">
+  <meta name="description" content="Distributed topology, shard replication, non-AI visual extraction, GitOps config-as-code, and 3-tier throttling in Anvesh.">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -19,6 +19,8 @@
     <a class="topnav-brand" href="index.html"><img src="assets/images/anvesh-logo.svg" alt="Anvesh"></a>
     <div class="topnav-right">
       <a class="topnav-link" href="getting-started.html">Docs</a>
+      <a class="topnav-link" href="features.html">Features</a>
+      <a class="topnav-link" href="architecture.html">Architecture</a>
       <button class="theme-btn" id="themeToggle" aria-label="Toggle theme"><svg id="sunIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg><svg id="moonIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></button>
       <a class="topnav-btn topnav-btn--ghost" href="https://github.com/vaagatech/anvesh" target="_blank" rel="noopener noreferrer"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg> GitHub</a>
       <a class="topnav-btn topnav-btn--primary" href="getting-started.html">Get Started →</a>
@@ -34,63 +36,54 @@
 
     <main class="docs-main" id="main-content">
       <div class="page-label">Platform</div>
-      <h1 class="page-title">Distributed Architecture</h1>
-      <p class="page-desc">How Anvesh distributes data, coordinates nodes, and ensures fault tolerance across the cluster.</p>
+      <h1 class="page-title">Distributed Microservices Architecture</h1>
+      <p class="page-desc">How Anvesh decouples query serving, ingestion, multimodal extraction, and control plane coordination.</p>
 
       <div class="prose">
-        <h2>System Overview</h2>
-        <p>Anvesh follows a <strong>shared-nothing</strong> architecture. Each node independently handles queries for the shards it owns. The Hub component acts as the coordination layer and entry point.</p>
+        <h2>System Topology</h2>
+        <p>Anvesh is built on decoupled, independently scalable microservices in Node.js & TypeScript. Search query serving is strictly isolated from heavy batch ingestion and OCR pipelines to guarantee low latency.</p>
 
-        <h3>Core Components</h3>
+        <h3>Core Fleet Components</h3>
         <table>
-          <thead><tr><th>Component</th><th>Role</th><th>Port</th></tr></thead>
+          <thead><tr><th>Component</th><th>Role</th><th>Port / Package</th></tr></thead>
           <tbody>
-            <tr><td><strong>Anvesh Engine</strong></td><td>Index storage, query execution, vector search</td><td><code>3848</code></td></tr>
-            <tr><td><strong>Hub</strong></td><td>Coordination, routing, control plane UI</td><td><code>3849</code></td></tr>
-            <tr><td><strong>Spider</strong></td><td>Web crawling & content extraction</td><td><code>3851</code></td></tr>
-            <tr><td><strong>Bulk Indexer</strong></td><td>High-throughput streaming ingestion</td><td><code>3852</code></td></tr>
+            <tr><td><strong>Anvesh Engine</strong></td><td>Ultra-fast BM25 & SQ8 Vector Search, DFS, In-memory Inverted Index</td><td><code>:3848</code> / <code>apps/engine</code></td></tr>
+            <tr><td><strong>Hub API & Control Plane</strong></td><td>Cluster telemetry, AWS Cognito RBAC, Config reconciler, Admin UI</td><td><code>:3849</code> / <code>apps/hub-api</code></td></tr>
+            <tr><td><strong>Spider Crawler</strong></td><td>Asynchronous web scraper, role auth & depth crawler</td><td><code>:3851</code> / <code>apps/spider</code></td></tr>
+            <tr><td><strong>Bulk Indexer</strong></td><td>Stream ingestion worker, batching & dead-letter management</td><td><code>:3852</code> / <code>apps/indexer</code></td></tr>
+            <tr><td><strong>Visual & OCR Extractor</strong></td><td>Pure-CPU local OCR, textile color & motif classifier</td><td><code>packages/visual-extractor</code></td></tr>
+            <tr><td><strong>Client SDK & CLI</strong></td><td>TypeScript client & GitOps automation tooling</td><td><code>packages/sdk</code> / <code>packages/cli</code></td></tr>
           </tbody>
         </table>
 
-        <h2>Data Distribution</h2>
-        <p>Indexes are split into <strong>shards</strong> distributed across available Anvesh Engine nodes. Each shard contains:</p>
-        <ul>
-          <li><strong>Inverted index</strong> — BM25 tokenized term postings</li>
-          <li><strong>HNSW graph</strong> — dense vector approximate nearest neighbor index</li>
-          <li><strong>Column store</strong> — stored fields for retrieval and faceting</li>
-          <li><strong>WAL</strong> — write-ahead log for crash recovery</li>
-        </ul>
+        <h2>Ingestion vs Query Serving Isolation</h2>
+        <p>Heavy operations (such as image extraction, OCR, and bulk JSON streams) are processed exclusively by <code>apps/indexer</code> and worker scripts. The search engine nodes (<code>apps/engine</code>) only receive structured text, pre-quantized vectors, and metadata, guaranteeing sub-millisecond query execution.</p>
 
-        <h2>Segment Lifecycle</h2>
-        <p>Documents are written to an in-memory buffer, then flushed to immutable <strong>segments</strong>. Small segments are periodically merged. Stale segments are promoted to object storage automatically.</p>
+        <h2>3-Tier Protective Throttling System</h2>
+        <p>Every engine node is shielded by three independent layers of defense:</p>
         <ol>
-          <li><strong>Buffer</strong> → documents held in memory + WAL</li>
-          <li><strong>Flush</strong> → immutable segment written to disk</li>
-          <li><strong>Merge</strong> → small segments consolidated into larger ones</li>
-          <li><strong>Tier</strong> → cold segments offloaded to S3/OCI Object Storage</li>
+          <li><strong>Layer 1: RPM Rate Limiter</strong> — Fastify token/IP throttling (default 120 req/min).</li>
+          <li><strong>Layer 2: In-Flight Concurrency Guard</strong> — Maximum 32 concurrent searches per pod. Overflows are shed with HTTP <code>429 ERR_CIRCUIT_CONCURRENT</code>.</li>
+          <li><strong>Layer 3: Memory Backpressure</strong> — Proactive GC at 75% heap; automatic load shedding at 85% heap (<code>429 ERR_CIRCUIT_MEMORY</code>) to prevent OOM restarts.</li>
         </ol>
 
-        <h2>Fault Tolerance</h2>
+        <h2>Segment Storage & Tiering</h2>
+        <p>Documents are ingested to in-memory buffers with WAL, then flushed to immutable segments:</p>
         <ul>
-          <li><strong>Replica shards</strong> — configurable replication factor per index</li>
-          <li><strong>Write-ahead log</strong> — survives process crashes</li>
-          <li><strong>Dead-letter queue</strong> — captures and retries failed operations</li>
-          <li><strong>Health checks</strong> — Hub detects unresponsive nodes and re-routes queries</li>
+          <li><strong>Hot Tier</strong> — In-memory segments for active indices</li>
+          <li><strong>Warm Tier</strong> — Local SSD storage for recent indexes</li>
+          <li><strong>Cold Tier</strong> — Immutable segment archives on Amazon S3 or OCI Object Storage</li>
         </ul>
 
-        <div class="callout">
-          <strong>Single-node mode:</strong> For development and small deployments, Anvesh runs as a single process with all components embedded. No external dependencies needed.
-        </div>
-
-        <h2>Benchmarks</h2>
+        <h2>Production Performance & Footprint</h2>
         <table>
           <thead><tr><th>Metric</th><th>Value</th><th>Conditions</th></tr></thead>
           <tbody>
-            <tr><td><strong>Query latency (p50)</strong></td><td>0.3 ms</td><td>1M docs, 3 fields, single node</td></tr>
-            <tr><td><strong>Query latency (p99)</strong></td><td>0.8 ms</td><td>1M docs, 3 fields, single node</td></tr>
-            <tr><td><strong>Indexing throughput</strong></td><td>15,000 docs/s</td><td>Single node, bulk API</td></tr>
-            <tr><td><strong>Memory footprint</strong></td><td>~80 MB</td><td>1M docs indexed</td></tr>
-            <tr><td><strong>Binary size</strong></td><td>~18 MB</td><td>Statically compiled Go</td></tr>
+            <tr><td><strong>Search Query Latency (p50)</strong></td><td>0.3 ms</td><td>100K docs, BM25 + Vector Hybrid</td></tr>
+            <tr><td><strong>Search Query Latency (p99)</strong></td><td>0.8 ms</td><td>100K docs, BM25 + Vector Hybrid</td></tr>
+            <tr><td><strong>Ingestion Throughput</strong></td><td>12,000+ docs/s</td><td>Bulk streaming API</td></tr>
+            <tr><td><strong>Memory Footprint (Idle)</strong></td><td>~70 MB</td><td>Engine Node (Node.js runtime)</td></tr>
+            <tr><td><strong>Vector Memory Savings</strong></td><td>75% reduction</td><td>SQ8 8-bit Quantization</td></tr>
           </tbody>
         </table>
       </div>
@@ -98,6 +91,14 @@
   </div>
 
   <footer class="site-footer"><p>© <script>document.write(new Date().getFullYear())</script> VaagaTech · <a href="https://github.com/vaagatech/anvesh">GitHub</a></p></footer>
-  <script>(function(){const b=document.getElementById('themeToggle'),s=document.getElementById('sunIcon'),m=document.getElementById('moonIcon');function a(t){document.documentElement.setAttribute('data-theme',t);localStorage.setItem('anvesh-theme',t);s.style.display=t==='dark'?'block':'none';m.style.display=t==='dark'?'none':'block';}a(localStorage.getItem('anvesh-theme')||'light');b.addEventListener('click',function(){a(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark');});})();</script>
+
+  <script>
+    (function(){
+      const btn=document.getElementById('themeToggle'),sun=document.getElementById('sunIcon'),moon=document.getElementById('moonIcon');
+      function apply(t){document.documentElement.setAttribute('data-theme',t);localStorage.setItem('anvesh-theme',t);sun.style.display=t==='dark'?'block':'none';moon.style.display=t==='dark'?'none':'block';}
+      apply(localStorage.getItem('anvesh-theme')||'light');
+      btn.addEventListener('click',function(){apply(document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark');});
+    })();
+  </script>
 </body>
 </html>
