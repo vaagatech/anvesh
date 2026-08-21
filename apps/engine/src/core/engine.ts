@@ -9,6 +9,7 @@ import { VectorStore, type VectorStoreSnapshot } from "./vector-store.js";
 import { blendScores, reciprocalRankFusion } from "./hybrid.js";
 import { assertGeoPoint, distanceFromOrigin, validateGeoQuery } from "./geo.js";
 import { localEmbed, textFromFields, meaningfulVectorHits } from "./embed.js";
+import { createEmbeddingAdapter } from "./embedding-adapters.js";
 import { globalCircuits } from "./circuit.js";
 import {
   coerceDocumentFields,
@@ -442,7 +443,8 @@ export class AnveshEngine {
       let vector = input.vector;
       if (!vector && this.shouldAutoEmbed(state.definition.settings)) {
         const dims = state.definition.settings!.vectorDimensions!;
-        vector = localEmbed(textFromFields(fields), dims);
+        const adapter = createEmbeddingAdapter(state.definition.settings?.embeddingConfig);
+        vector = await adapter.embed(textFromFields(fields), dims);
       }
       const doc: AnveshDocument = {
         id,
@@ -502,7 +504,8 @@ export class AnveshEngine {
           const fields = this.prepareFields(state, item.fields);
           let vector = item.vector;
           if (!vector && auto && dims) {
-            vector = localEmbed(textFromFields(fields), dims);
+            const adapter = createEmbeddingAdapter(state.definition.settings?.embeddingConfig);
+            vector = await adapter.embed(textFromFields(fields), dims);
           }
           const doc: AnveshDocument = {
             id,
@@ -628,6 +631,27 @@ export class AnveshEngine {
     return { deleted: ids.length };
   }
 
+  async searchAsync(indexName: string, query: SearchQuery): Promise<SearchResult> {
+    const state = this.require(indexName);
+    const mode =
+      query.mode ??
+      (query.geo && !query.q && !query.vector
+        ? "geo"
+        : query.vector
+          ? query.q
+            ? "hybrid"
+            : "semantic"
+          : "keyword");
+    let queryVector = query.vector;
+    const needsVector = mode === "semantic" || mode === "hybrid";
+    if (needsVector && !queryVector && query.q && this.shouldAutoEmbed(state.definition.settings)) {
+      const dims = state.definition.settings!.vectorDimensions!;
+      const adapter = createEmbeddingAdapter(state.definition.settings?.embeddingConfig);
+      queryVector = await adapter.embed(query.q, dims);
+    }
+    return this.search(indexName, { ...query, vector: queryVector });
+  }
+
   search(indexName: string, query: SearchQuery): SearchResult {
     const started = performance.now();
     const state = this.require(indexName);
@@ -673,7 +697,8 @@ export class AnveshEngine {
     const needsVector = mode === "semantic" || mode === "hybrid";
     if (needsVector && !queryVector && query.q && this.shouldAutoEmbed(state.definition.settings)) {
       const dims = state.definition.settings!.vectorDimensions!;
-      queryVector = localEmbed(query.q, dims);
+      const adapter = createEmbeddingAdapter(state.definition.settings?.embeddingConfig);
+      queryVector = adapter.embedSync ? adapter.embedSync(query.q, dims) : localEmbed(query.q, dims);
       this.ensureVectorStore(state);
     }
 

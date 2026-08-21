@@ -98,6 +98,8 @@ export interface IndexSettings {
   minimumShouldMatch?: string | number;
   /** When true (default), enables Knowledge Graph entity & triple storage and semantic graph search. */
   enableKnowledgeGraph?: boolean;
+  /** Optional pluggable embedding configuration (e.g. "local", "openai", "gemini", "ollama", "custom"). Defaults to zero-overhead "local". */
+  embeddingConfig?: import("./core/embedding-adapters.js").EmbeddingConfig;
 }
 
 export interface IndexDefinition {
