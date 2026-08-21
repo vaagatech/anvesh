@@ -145,6 +145,8 @@ spec:
       labels:
         app.kubernetes.io/name: anvesh-engine
     spec:
+      imagePullSecrets:
+        - name: ocir-secret
       securityContext:
         runAsUser: 1000
         runAsGroup: 1000
@@ -153,8 +155,8 @@ spec:
           type: RuntimeDefault
       containers:
         - name: anvesh-engine
-          image: anvesh:0.1.0
-          imagePullPolicy: Never
+          image: hyd.ocir.io/axkdaujrafzw/anvesh:0.1.0
+          imagePullPolicy: Always
           command: ["node", "apps/engine/dist/cli.js", "serve"]
           ports:
             - name: http
@@ -225,6 +227,8 @@ spec:
       labels:
         app.kubernetes.io/name: anvesh-spider
     spec:
+      imagePullSecrets:
+        - name: ocir-secret
       securityContext:
         runAsUser: 1000
         runAsGroup: 1000
@@ -233,8 +237,8 @@ spec:
           type: RuntimeDefault
       containers:
         - name: anvesh-spider
-          image: anvesh:0.1.0
-          imagePullPolicy: Never
+          image: hyd.ocir.io/axkdaujrafzw/anvesh:0.1.0
+          imagePullPolicy: Always
           command: ["node", "apps/spider/dist/cli.js", "serve"]
           ports:
             - name: http
@@ -305,6 +309,8 @@ spec:
       labels:
         app.kubernetes.io/name: anvesh-indexer
     spec:
+      imagePullSecrets:
+        - name: ocir-secret
       securityContext:
         runAsUser: 1000
         runAsGroup: 1000
@@ -313,8 +319,8 @@ spec:
           type: RuntimeDefault
       containers:
         - name: anvesh-indexer
-          image: anvesh:0.1.0
-          imagePullPolicy: Never
+          image: hyd.ocir.io/axkdaujrafzw/anvesh:0.1.0
+          imagePullPolicy: Always
           command: ["node", "apps/indexer/dist/cli.js", "serve"]
           ports:
             - name: http
@@ -385,6 +391,8 @@ spec:
       labels:
         app.kubernetes.io/name: anvesh-hub
     spec:
+      imagePullSecrets:
+        - name: ocir-secret
       securityContext:
         runAsUser: 1000
         runAsGroup: 1000
@@ -393,8 +401,8 @@ spec:
           type: RuntimeDefault
       containers:
         - name: anvesh-hub
-          image: anvesh:0.1.0
-          imagePullPolicy: Never
+          image: hyd.ocir.io/axkdaujrafzw/anvesh:0.1.0
+          imagePullPolicy: Always
           command: ["node", "apps/hub-api/dist/cli.js", "serve"]
           ports:
             - name: http
