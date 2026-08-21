@@ -237,6 +237,53 @@ describe("dynamic mapping", () => {
     expect(index.mappings.extra_tag).toBeUndefined();
     expect(index.mappings.title?.type).toBe("text");
   });
+
+  it("handles 'with' as conjunction and enforces AND matching", async () => {
+    const engine = new AnveshEngine(new MemoryStorage());
+    await engine.init();
+    await engine.createIndex("apparel", {
+      name: { type: "text" },
+      description: { type: "text" },
+    });
+
+    await engine.indexDocument("apparel", {
+      id: "doc-1",
+      fields: {
+        name: "Pure Kanjivaram Silk Saree",
+        description: "Handcrafted pure silk saree with regal elephant motif and gold zari border.",
+      },
+    });
+
+    await engine.indexDocument("apparel", {
+      id: "doc-2",
+      fields: {
+        name: "Casual Cotton Saree",
+        description: "Comfortable daily wear printed floral saree.",
+      },
+    });
+
+    await engine.indexDocument("apparel", {
+      id: "doc-3",
+      fields: {
+        name: "Brass Elephant Figurine",
+        description: "Antique solid brass elephant statue for home decor.",
+      },
+    });
+
+    // 1. Conjunction query "saree with elephant" -> Must match ONLY doc-1 (has both saree & elephant)
+    const resWith = engine.search("apparel", { q: "saree with elephant", mode: "keyword" });
+    expect(resWith.total).toBe(1);
+    expect(resWith.hits[0]!.id).toBe("doc-1");
+
+    // 2. Explicit operator: "AND" -> Must match ONLY doc-1
+    const resAnd = engine.search("apparel", { q: "saree elephant", mode: "keyword", operator: "AND" });
+    expect(resAnd.total).toBe(1);
+    expect(resAnd.hits[0]!.id).toBe("doc-1");
+
+    // 3. Explicit operator: "OR" -> Matches doc-1, doc-2, doc-3
+    const resOr = engine.search("apparel", { q: "saree elephant", mode: "keyword", operator: "OR" });
+    expect(resOr.total).toBe(3);
+  });
 });
 
 describe("circuit breakers", () => {

@@ -21,6 +21,8 @@ import {
   WEB_MAPPINGS,
   WEB_SETTINGS,
   globalDeadLetter,
+  discoverVisionService,
+  embedImageWithDiscovery,
   type CrawledPage,
   type IndexDocumentPayload,
 } from "@vaagatech/anvesh-shared";
@@ -152,6 +154,24 @@ async function bulkToEngine(
   if (apiKeyHeader) headers.authorization = `Bearer ${apiKeyHeader}`;
   let indexed = 0;
   let failed = 0;
+
+  // Dynamic Service Discovery for Multi-Modal Vision Microservice
+  const visionCap = await discoverVisionService();
+  if (visionCap?.available) {
+    pushLog(job, `Vision microservice detected (${visionCap.modelKind}, ${visionCap.dimensions} dims) — generating multi-modal image embeddings.`);
+    for (const doc of documents) {
+      const imgUrl = (doc.fields?.image || doc.fields?.imageUrl || doc.fields?.listingUrl || doc.fields?.thumbnailUrl) as string | undefined;
+      if (imgUrl && typeof imgUrl === "string" && !doc.fields?.image_vector) {
+        try {
+          const vec = await embedImageWithDiscovery(imgUrl, visionCap);
+          if (vec) {
+            doc.fields.image_vector = vec;
+            if (!doc.vector) doc.vector = vec;
+          }
+        } catch (_) {}
+      }
+    }
+  }
 
   const sampleBytes = documents.length ? JSON.stringify(documents[0]).length : 2048;
   const adaptiveBatch = globalResourceGuard.calculateAdaptiveChunkSize(documents.length, sampleBytes, batchSize);

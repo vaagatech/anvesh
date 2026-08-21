@@ -16,6 +16,8 @@ import {
 } from "./dynamic-mapping.js";
 import { AnveshError, formatMessage } from "../messaging/vaakly.js";
 import { globalDeadLetter, globalResourceGuard, type DeadLetterEntry } from "@vaagatech/anvesh-shared";
+import { KnowledgeGraphStore, type GraphEntity, type GraphTriple, type GraphNeighborhood, type GraphSearchResult } from "./knowledge-graph.js";
+import { buildAutocompleteSuggestions, type AutocompleteSuggestion, type AutocompleteOptions } from "./autocomplete.js";
 import type { StorageAdapter } from "../storage/types.js";
 import type {
   BoostRule,
@@ -36,6 +38,7 @@ export interface IndexState {
   definition: IndexDefinition;
   inverted: InvertedIndex;
   vectors: VectorStore | null;
+  graph: KnowledgeGraphStore | null;
 }
 
 export interface PersistedIndex {
@@ -115,7 +118,9 @@ export class AnveshEngine {
               settings.vectorQuantization ?? "none",
             )
           : null;
-    return { definition: raw.definition, inverted, vectors };
+    const enableGraph = settings?.enableKnowledgeGraph !== false && process.env.ANVESH_ENABLE_KNOWLEDGE_GRAPH !== "false";
+    const graph = enableGraph ? new KnowledgeGraphStore(raw.definition.name) : null;
+    return { definition: raw.definition, inverted, vectors, graph };
   }
 
   private persistPayload(state: IndexState): PersistedIndex {
@@ -200,7 +205,9 @@ export class AnveshEngine {
           settings.vectorQuantization ?? "none",
         )
       : null;
-    this.indexes.set(name, { definition, inverted, vectors });
+    const enableGraph = settings.enableKnowledgeGraph !== false && process.env.ANVESH_ENABLE_KNOWLEDGE_GRAPH !== "false";
+    const graph = enableGraph ? new KnowledgeGraphStore(name) : null;
+    this.indexes.set(name, { definition, inverted, vectors, graph });
     this.markDirty(name);
     await this.flush(name);
     return definition;
@@ -265,6 +272,56 @@ export class AnveshEngine {
   ): string[] {
     const state = this.require(indexName);
     return state.inverted.suggest(prefix, options.field, options.size ?? 10);
+  }
+
+  autocomplete(
+    indexName: string,
+    query: string,
+    options: Partial<AutocompleteOptions> = {},
+  ): AutocompleteSuggestion[] {
+    const state = this.require(indexName);
+    return buildAutocompleteSuggestions(state.inverted, state.graph, { q: query, ...options });
+  }
+
+  addGraphEntities(indexName: string, entities: GraphEntity[]): { added: number } {
+    const state = this.require(indexName);
+    if (!state.graph) throw new AnveshError("ERR_VALIDATION", { detail: "Knowledge graph is disabled for this index." });
+    for (const ent of entities) state.graph.addEntity(ent);
+    return { added: entities.length };
+  }
+
+  addGraphTriples(indexName: string, triples: GraphTriple[]): { added: number } {
+    const state = this.require(indexName);
+    if (!state.graph) throw new AnveshError("ERR_VALIDATION", { detail: "Knowledge graph is disabled for this index." });
+    for (const tr of triples) state.graph.addTriple(tr);
+    return { added: triples.length };
+  }
+
+  getGraphNeighborhood(
+    indexName: string,
+    entityId: string,
+    maxHops = 1,
+    predicates?: string[],
+  ): GraphNeighborhood | null {
+    const state = this.require(indexName);
+    if (!state.graph) throw new AnveshError("ERR_VALIDATION", { detail: "Knowledge graph is disabled for this index." });
+    return state.graph.getNeighborhood(entityId, maxHops, predicates);
+  }
+
+  searchGraph(
+    indexName: string,
+    query: string,
+    options: { maxHops?: number; types?: string[]; limit?: number } = {},
+  ): GraphSearchResult {
+    const state = this.require(indexName);
+    if (!state.graph) throw new AnveshError("ERR_VALIDATION", { detail: "Knowledge graph is disabled for this index." });
+    return state.graph.search(query, options);
+  }
+
+  getGraphStats(indexName: string): { totalEntities: number; totalTriples: number; entityTypes: Record<string, number> } {
+    const state = this.require(indexName);
+    if (!state.graph) return { totalEntities: 0, totalTriples: 0, entityTypes: {} };
+    return state.graph.stats();
   }
 
   async updateByQuery(
@@ -668,6 +725,8 @@ export class AnveshEngine {
         size: Math.max(size * (query.mustNot?.length || query.should?.length ? 3 : 1), size),
         highlight: query.highlight,
         minScore: query.minScore,
+        operator: query.operator,
+        minimumShouldMatch: query.minimumShouldMatch,
         ...fuzzyOpts,
       });
       let hitsList = res.hits;
@@ -730,6 +789,8 @@ export class AnveshEngine {
         from: 0,
         size: Math.max(size * 5, 50),
         highlight: Boolean(query.highlight),
+        operator: query.operator,
+        minimumShouldMatch: query.minimumShouldMatch,
         ...fuzzyOpts,
       });
       const keywordScores = new Map(kwRes.hits.map((h) => [h.id, h.score]));

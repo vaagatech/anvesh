@@ -48,6 +48,8 @@ export interface IndexSettings {
   ocrEnabled?: boolean;
   colorExtraction?: boolean;
   motifExtraction?: boolean;
+  defaultOperator?: "AND" | "OR";
+  minimumShouldMatch?: string | number;
   [key: string]: any;
 }
 
@@ -71,6 +73,8 @@ export interface SearchQuery {
   highlight?: boolean;
   minScore?: number;
   boosts?: Record<string, number>;
+  operator?: "AND" | "OR";
+  minimumShouldMatch?: string | number;
   [key: string]: any;
 }
 
@@ -192,6 +196,58 @@ export interface VisualExtractionResult {
   };
   searchableText: string;
   tags: string[];
+}
+
+export interface AutocompleteSuggestion {
+  text: string;
+  type: "query" | "phrase" | "category" | "document" | "visual_tag" | "motif" | "color" | "entity";
+  score: number;
+  count?: number;
+  field?: string;
+  docId?: string;
+  payload?: Record<string, unknown>;
+}
+
+export interface ImageMetadataResult {
+  ocr: {
+    text: string;
+    confidence: number;
+    words: string[];
+  };
+  colors: string[];
+  motifs: string[];
+  tags: string[];
+  suggestedKeywords: string[];
+  autocompleteSuggestions: AutocompleteSuggestion[];
+}
+
+export interface GraphEntity {
+  id: string;
+  name: string;
+  type: string;
+  aliases?: string[];
+  properties?: Record<string, unknown>;
+  docIds?: string[];
+}
+
+export interface GraphTriple {
+  subject: string;
+  predicate: string;
+  object: string;
+  weight?: number;
+}
+
+export interface GraphNeighborhood {
+  entity: GraphEntity;
+  nodes: GraphEntity[];
+  edges: GraphTriple[];
+}
+
+export interface GraphSearchResult {
+  entities: GraphEntity[];
+  expandedTerms: string[];
+  relatedDocIds: string[];
+  edges: GraphTriple[];
 }
 
 export interface AnveshClientOptions {

@@ -52,4 +52,39 @@ export class IndexesClient {
     if (!res.ok) throw new Error(`Failed to delete index '${name}': ${await res.text()}`);
     return true;
   }
+
+  async suggest(name: string, prefix: string, options: { field?: string; size?: number } = {}): Promise<string[]> {
+    const headers = await this.tokenManager.getAuthHeaders();
+    const res = await fetch(`${this.baseUrl}/v1/indexes/${encodeURIComponent(name)}/suggest`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ prefix, ...options }),
+    });
+    if (!res.ok) throw new Error(`Suggest failed: ${await res.text()}`);
+    const data = (await res.json()) as { ok: boolean; suggestions: string[] };
+    return data.suggestions;
+  }
+
+  async autocomplete(
+    name: string,
+    query: string,
+    options: {
+      fields?: string[];
+      size?: number;
+      includeCategories?: boolean;
+      includeDocuments?: boolean;
+      includeVisualTags?: boolean;
+      includeGraphEntities?: boolean;
+    } = {}
+  ): Promise<import("./types.js").AutocompleteSuggestion[]> {
+    const headers = await this.tokenManager.getAuthHeaders();
+    const res = await fetch(`${this.baseUrl}/v1/indexes/${encodeURIComponent(name)}/autocomplete`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ q: query, ...options }),
+    });
+    if (!res.ok) throw new Error(`Autocomplete failed: ${await res.text()}`);
+    const data = (await res.json()) as { ok: boolean; suggestions: import("./types.js").AutocompleteSuggestion[] };
+    return data.suggestions;
+  }
 }

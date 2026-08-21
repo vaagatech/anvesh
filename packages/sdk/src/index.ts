@@ -6,4 +6,5 @@ export { SearchClient } from "./search.js";
 export { SpiderClient } from "./spider.js";
 export { ConfigClient } from "./config.js";
 export { ToolsClient } from "./tools.js";
+export { GraphClient } from "./graph.js";
 export * from "./types.js";

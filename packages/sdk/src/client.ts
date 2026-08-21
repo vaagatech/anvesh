@@ -5,6 +5,7 @@ import { IndexesClient } from "./indexes.js";
 import { SearchClient } from "./search.js";
 import { SpiderClient } from "./spider.js";
 import { ToolsClient } from "./tools.js";
+import { GraphClient } from "./graph.js";
 import type { AnveshClientOptions, SearchQuery, SearchResult } from "./types.js";
 
 export class AnveshClient {
@@ -14,6 +15,7 @@ export class AnveshClient {
   public readonly spider: SpiderClient;
   public readonly config: ConfigClient;
   public readonly tools: ToolsClient;
+  public readonly graph: GraphClient;
 
   private readonly tokenManager: TokenManager;
   private readonly baseUrl: string;
@@ -31,6 +33,7 @@ export class AnveshClient {
     this.spider = new SpiderClient(this.baseUrl, this.tokenManager);
     this.config = new ConfigClient(this.baseUrl, this.tokenManager);
     this.tools = new ToolsClient(this.baseUrl, this.tokenManager);
+    this.graph = new GraphClient(this.baseUrl, this.tokenManager);
   }
 
   /**

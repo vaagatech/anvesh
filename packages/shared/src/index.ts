@@ -267,4 +267,10 @@ export {
   globalDeadLetter,
   type DeadLetterEntry,
 } from "./dead-letter.js";
+export {
+  discoverVisionService,
+  embedImageWithDiscovery,
+  embedTextWithDiscovery,
+  type VisionCapability,
+} from "./discovery.js";
 

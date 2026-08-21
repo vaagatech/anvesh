@@ -1,0 +1,606 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Anvesh Search Engine & Vector Database REST API",
+    "version": "0.4.0",
+    "description": "Ultra-lightweight, cloud-native search engine and vector database API by VaagaTech. Features sub-millisecond hybrid BM25 + vector search, non-AI visual/OCR extraction, Knowledge Graph storage, GitOps config-as-code schema evolution, and 3-tier concurrency throttling.",
+    "contact": {
+      "name": "VaagaTech Engineering",
+      "url": "https://www.vaagatech.com",
+      "email": "support@vaagatech.com"
+    },
+    "license": {
+      "name": "Apache 2.0 / MIT",
+      "url": "https://github.com/vaagatech/anvesh/blob/main/LICENSE"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3848",
+      "description": "Local Anvesh Engine Instance"
+    },
+    {
+      "url": "http://anvesh-engine.anvesh.svc.cluster.local:3848",
+      "description": "Kubernetes In-Cluster Service"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Health Check & Cluster Status",
+        "description": "Returns uptime, memory footprint, storage backend, and overall node health status.",
+        "responses": {
+          "200": {
+            "description": "Cluster is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean", "example": true },
+                    "status": { "type": "string", "example": "healthy" },
+                    "uptimeMs": { "type": "number", "example": 14205 },
+                    "storage": { "type": "string", "example": "tiered" },
+                    "memory": {
+                      "type": "object",
+                      "properties": {
+                        "rssMb": { "type": "number", "example": 72.4 },
+                        "heapUsedMb": { "type": "number", "example": 45.1 }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/indexes": {
+      "get": {
+        "summary": "List All Indexes",
+        "description": "Returns metadata and statistics for all active search indexes.",
+        "responses": {
+          "200": {
+            "description": "List of index definitions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean", "example": true },
+                    "indexes": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/IndexDefinition" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Search Index",
+        "description": "Creates a new search index with custom schema mappings, vector dimensions, and analyzers.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name": { "type": "string", "example": "products" },
+                  "mappings": {
+                    "type": "object",
+                    "additionalProperties": { "$ref": "#/components/schemas/FieldMapping" }
+                  },
+                  "settings": { "$ref": "#/components/schemas/IndexSettings" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Index created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean", "example": true },
+                    "index": { "$ref": "#/components/schemas/IndexDefinition" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/indexes/{name}/search": {
+      "post": {
+        "summary": "Execute Search Query",
+        "description": "Executes full-text BM25, semantic vector, hybrid reciprocal rank fusion (RRF), or geo search with natural language conjunction operators and highlight bounded windows.",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Target index name"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SearchQuery" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Search results with ranked hits and facets",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SearchResult" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/indexes/{name}/autocomplete": {
+      "get": {
+        "summary": "Fast Search Autocomplete (GET)",
+        "description": "Returns multi-facet autocomplete suggestions across query prefix terms, document titles, category taxonomies, visual tags, and Knowledge Graph entities.",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "example": "roy" }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "schema": { "type": "integer", "default": 10 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Autocomplete suggestion list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean", "example": true },
+                    "query": { "type": "string", "example": "roy" },
+                    "suggestions": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/AutocompleteSuggestion" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Multi-Facet Autocomplete (POST)",
+        "description": "Rich autocomplete query with options to toggle categories, documents, visual tags, and graph entities.",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["q"],
+                "properties": {
+                  "q": { "type": "string", "example": "saree" },
+                  "size": { "type": "integer", "default": 10 },
+                  "includeCategories": { "type": "boolean", "default": true },
+                  "includeDocuments": { "type": "boolean", "default": true },
+                  "includeVisualTags": { "type": "boolean", "default": true },
+                  "includeGraphEntities": { "type": "boolean", "default": true }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Autocomplete suggestions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean", "example": true },
+                    "query": { "type": "string" },
+                    "suggestions": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/AutocompleteSuggestion" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/tools/image-metadata": {
+      "post": {
+        "summary": "Extract Image Metadata & Visual Autocomplete Tags",
+        "description": "Analyzes image pixels via pure-CPU OCR, textile color histogram matching, and edge-density motif classification, returning structured metadata and instant search bar autocomplete phrases.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "image": { "type": "string", "example": "https://example.com/saree.jpg" },
+                  "bufferBase64": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Extracted visual metadata and tags",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean", "example": true },
+                    "metadata": { "$ref": "#/components/schemas/ImageMetadataResult" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/indexes/{name}/graph/entities": {
+      "post": {
+        "summary": "Ingest Knowledge Graph Entities",
+        "description": "Ingests entities into the index Knowledge Graph (compatible with Graphify and Google OKF schemas).",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["entities"],
+                "properties": {
+                  "entities": {
+                    "type": "array",
+                    "items": { "$ref": "#/components/schemas/GraphEntity" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Entities added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean", "example": true },
+                    "added": { "type": "integer", "example": 5 }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/indexes/{name}/graph/triples": {
+      "post": {
+        "summary": "Ingest Knowledge Graph Triples / Relations",
+        "description": "Ingests relationship edges (subject -> predicate -> object) into the index Knowledge Graph.",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["triples"],
+                "properties": {
+                  "triples": {
+                    "type": "array",
+                    "items": { "$ref": "#/components/schemas/GraphTriple" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Triples added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean", "example": true },
+                    "added": { "type": "integer", "example": 8 }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/indexes/{name}/graph/search": {
+      "post": {
+        "summary": "Search Knowledge Graph",
+        "description": "Performs entity resolution and multi-hop relation traversal to return connected concepts and document IDs.",
+        "parameters": [
+          {
+            "name": "name",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["query"],
+                "properties": {
+                  "query": { "type": "string", "example": "elephant" },
+                  "maxHops": { "type": "integer", "default": 1 },
+                  "types": { "type": "array", "items": { "type": "string" } },
+                  "limit": { "type": "integer", "default": 10 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Graph search results",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GraphSearchResult" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/config/plan": {
+      "post": {
+        "summary": "GitOps Config-as-Code Dry Run",
+        "description": "Computes a non-destructive diff showing additions, modifications, and deletions between current schema and target spec.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/AnveshConfigSpec" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reconciliation plan",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": { "type": "boolean", "example": true },
+                    "plan": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "action": { "type": "string", "example": "create_index" },
+                          "target": { "type": "string", "example": "products" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "FieldMapping": {
+        "type": "object",
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["text", "keyword", "number", "boolean", "date", "geo_point"]
+          },
+          "analyzer": { "type": "string", "example": "standard" },
+          "index": { "type": "boolean", "default": true }
+        }
+      },
+      "IndexSettings": {
+        "type": "object",
+        "properties": {
+          "vectorDimensions": { "type": "integer", "example": 512 },
+          "vectorMetric": { "type": "string", "enum": ["cosine", "dot_product", "euclidean"] },
+          "defaultOperator": { "type": "string", "enum": ["AND", "OR"], "default": "OR" },
+          "minimumShouldMatch": { "type": "string", "example": "100%" },
+          "enableVisualExtraction": { "type": "boolean", "default": true },
+          "enableKnowledgeGraph": { "type": "boolean", "default": true }
+        }
+      },
+      "IndexDefinition": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "mappings": { "type": "object" },
+          "settings": { "$ref": "#/components/schemas/IndexSettings" },
+          "docCount": { "type": "integer" },
+          "createdAt": { "type": "string" },
+          "updatedAt": { "type": "string" }
+        }
+      },
+      "SearchQuery": {
+        "type": "object",
+        "properties": {
+          "q": { "type": "string", "example": "saree with elephant" },
+          "fields": { "type": "array", "items": { "type": "string" } },
+          "mode": { "type": "string", "enum": ["keyword", "semantic", "hybrid", "geo"] },
+          "operator": { "type": "string", "enum": ["AND", "OR"] },
+          "minimumShouldMatch": { "type": "string", "example": "100%" },
+          "highlight": { "type": "boolean", "default": true },
+          "size": { "type": "integer", "default": 10 }
+        }
+      },
+      "SearchResult": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean", "example": true },
+          "total": { "type": "integer", "example": 42 },
+          "tookMs": { "type": "number", "example": 0.65 },
+          "hits": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": { "type": "string" },
+                "score": { "type": "number" },
+                "source": { "type": "object" },
+                "highlight": { "type": "object" }
+              }
+            }
+          }
+        }
+      },
+      "AutocompleteSuggestion": {
+        "type": "object",
+        "properties": {
+          "text": { "type": "string", "example": "Royal Blue Silk Saree" },
+          "type": {
+            "type": "string",
+            "enum": ["query", "phrase", "category", "document", "visual_tag", "motif", "color", "entity"]
+          },
+          "score": { "type": "number", "example": 0.95 },
+          "count": { "type": "integer" },
+          "docId": { "type": "string" },
+          "payload": { "type": "object" }
+        }
+      },
+      "ImageMetadataResult": {
+        "type": "object",
+        "properties": {
+          "ocr": {
+            "type": "object",
+            "properties": {
+              "text": { "type": "string" },
+              "confidence": { "type": "number" },
+              "words": { "type": "array", "items": { "type": "string" } }
+            }
+          },
+          "colors": { "type": "array", "items": { "type": "string" } },
+          "motifs": { "type": "array", "items": { "type": "string" } },
+          "tags": { "type": "array", "items": { "type": "string" } },
+          "suggestedKeywords": { "type": "array", "items": { "type": "string" } },
+          "autocompleteSuggestions": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/AutocompleteSuggestion" }
+          }
+        }
+      },
+      "GraphEntity": {
+        "type": "object",
+        "required": ["id", "name", "type"],
+        "properties": {
+          "id": { "type": "string", "example": "product:101" },
+          "name": { "type": "string", "example": "Kanjivaram Silk Saree" },
+          "type": { "type": "string", "example": "Product" },
+          "aliases": { "type": "array", "items": { "type": "string" } },
+          "properties": { "type": "object" },
+          "docIds": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "GraphTriple": {
+        "type": "object",
+        "required": ["subject", "predicate", "object"],
+        "properties": {
+          "subject": { "type": "string", "example": "product:101" },
+          "predicate": { "type": "string", "example": "hasMotif" },
+          "object": { "type": "string", "example": "motif:elephant" },
+          "weight": { "type": "number", "default": 1.0 }
+        }
+      },
+      "GraphSearchResult": {
+        "type": "object",
+        "properties": {
+          "entities": { "type": "array", "items": { "$ref": "#/components/schemas/GraphEntity" } },
+          "expandedTerms": { "type": "array", "items": { "type": "string" } },
+          "relatedDocIds": { "type": "array", "items": { "type": "string" } },
+          "edges": { "type": "array", "items": { "$ref": "#/components/schemas/GraphTriple" } }
+        }
+      },
+      "AnveshConfigSpec": {
+        "type": "object",
+        "properties": {
+          "version": { "type": "string", "example": "1.0" },
+          "indexes": { "type": "array", "items": { "type": "object" } }
+        }
+      }
+    }
+  }
+}

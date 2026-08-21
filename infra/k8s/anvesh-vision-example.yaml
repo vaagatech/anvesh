@@ -1,0 +1,136 @@
+# =========================================================================
+# EXAMPLE: Anvesh Multi-Modal Vision Microservice for Kubernetes (OCI / K3s)
+# NOTE: This manifest is an example template for future scaling.
+# Do NOT apply immediately if the cluster has tight memory constraints.
+# =========================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: anvesh-vision-config
+  namespace: anvesh
+  labels:
+    app.kubernetes.io/name: anvesh-vision
+    app.kubernetes.io/part-of: anvesh
+    app.kubernetes.io/vendor: vaagatech
+data:
+  ANVESH_VISION_HOST: "0.0.0.0"
+  ANVESH_VISION_PORT: "3853"
+  # Model Selection: "mobileclip" (quantized INT8 ~80MB, 150MB RAM) OR "openclip" (ViT-B/32 ~350MB, 500MB RAM)
+  ANVESH_VISION_MODEL: "mobileclip"
+  ANVESH_VISION_DEVICE: "cpu"
+  ANVESH_LOG_PRETTY: "0"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: anvesh-vision
+  namespace: anvesh
+  labels:
+    app.kubernetes.io/name: anvesh-vision
+    app.kubernetes.io/part-of: anvesh
+    app.kubernetes.io/component: vision-ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: anvesh-vision
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: anvesh-vision
+        app.kubernetes.io/part-of: anvesh
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: anvesh-vision
+          image: ghcr.io/vaagatech/anvesh-vision:0.4.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http-vision
+              containerPort: 3853
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: anvesh-vision-config
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            # Sizing for MobileCLIP (INT8 Quantized):
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              cpu: 1000m
+              memory: 384Mi
+            # If switching to OpenCLIP (ViT-B/32), adjust limits to:
+            # requests: { cpu: 200m, memory: 512Mi }
+            # limits:   { cpu: 2000m, memory: 1Gi }
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http-vision
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /v1/capabilities
+              port: http-vision
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 2
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: anvesh-vision
+  namespace: anvesh
+  labels:
+    app.kubernetes.io/name: anvesh-vision
+    app.kubernetes.io/part-of: anvesh
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: anvesh-vision
+  ports:
+    - name: http-vision
+      port: 3853
+      targetPort: 3853
+      protocol: TCP
+---
+# Optional: Horizontal Pod Autoscaler for high-throughput image embedding
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: anvesh-vision-hpa
+  namespace: anvesh
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: anvesh-vision
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 80

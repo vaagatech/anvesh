@@ -92,6 +92,12 @@ export interface IndexSettings {
   colorExtraction?: boolean;
   /** When false, disables motif & pattern detection. Default true. */
   motifExtraction?: boolean;
+  /** Default boolean operator for multi-term queries: "AND" | "OR". Default "OR". */
+  defaultOperator?: "AND" | "OR";
+  /** Minimum percentage or count of terms that must match (e.g. "100%", "75%", 2). */
+  minimumShouldMatch?: string | number;
+  /** When true (default), enables Knowledge Graph entity & triple storage and semantic graph search. */
+  enableKnowledgeGraph?: boolean;
 }
 
 export interface IndexDefinition {
@@ -219,6 +225,10 @@ export interface SearchQuery {
   maxFuzzyCandidates?: number;
   /** Facet modes: "field" (terms), "stats:field", "histogram:field:interval" */
   facetKinds?: string[];
+  /** Conjunction operator: "AND" (all tokens required) | "OR" (any token matches). */
+  operator?: "AND" | "OR";
+  /** Minimum percentage or count of query tokens that must match (e.g. "100%", "75%", 2). */
+  minimumShouldMatch?: string | number;
 }
 
 export interface SearchHit {

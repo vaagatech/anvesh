@@ -206,6 +206,8 @@ export class InvertedIndex {
       boosts?: Record<string, number>;
       searchAfter?: string;
       maxFuzzyCandidates?: number;
+      operator?: "AND" | "OR";
+      minimumShouldMatch?: string | number;
     } = {},
   ): { total: number; hits: SearchHit[] } {
     const rawTokens = query.trim().split(/\s+/).filter(Boolean);
@@ -217,6 +219,7 @@ export class InvertedIndex {
 
     const scores = new Map<DocumentId, number>();
     const matchedTerms = new Map<DocumentId, Set<string>>();
+    const matchedQueryTokens = new Map<DocumentId, Set<string>>();
     const fuzzyCap = options.maxFuzzyCandidates ?? 50;
 
     const collectTerms = (
@@ -308,7 +311,11 @@ export class InvertedIndex {
           const add = 2.5 * boost;
           scores.set(docId, (scores.get(docId) ?? 0) + add);
           if (!matchedTerms.has(docId)) matchedTerms.set(docId, new Set());
-          for (const t of tokens) matchedTerms.get(docId)!.add(t);
+          if (!matchedQueryTokens.has(docId)) matchedQueryTokens.set(docId, new Set());
+          for (const t of tokens) {
+            matchedTerms.get(docId)!.add(t);
+            matchedQueryTokens.get(docId)!.add(t);
+          }
         }
         continue;
       }
@@ -334,6 +341,8 @@ export class InvertedIndex {
             scores.set(p.docId, (scores.get(p.docId) ?? 0) + add);
             if (!matchedTerms.has(p.docId)) matchedTerms.set(p.docId, new Set());
             matchedTerms.get(p.docId)!.add(dictTerm);
+            if (!matchedQueryTokens.has(p.docId)) matchedQueryTokens.set(p.docId, new Set());
+            matchedQueryTokens.get(p.docId)!.add(term);
           }
         }
       }
@@ -342,10 +351,36 @@ export class InvertedIndex {
     const minScore = options.minScore ?? 0;
     const lowerQuery = query.toLowerCase();
 
+    // Conjunction analysis (e.g. "saree with elephant", "silk and zari", "dress having pockets")
+    const hasConjunctionWord = /\b(with|and|having|containing|plus)\b/i.test(query);
+    const defaultOp = this.settings.defaultOperator ?? "OR";
+    const effectiveOperator = options.operator ?? (hasConjunctionWord ? "AND" : defaultOp);
+
+    let minMatchesRequired = 1;
+    if (effectiveOperator === "AND" && !hasWildcard && tokens.length > 1) {
+      minMatchesRequired = tokens.length;
+    } else if (options.minimumShouldMatch && !hasWildcard) {
+      if (typeof options.minimumShouldMatch === "string" && options.minimumShouldMatch.endsWith("%")) {
+        const pct = parseFloat(options.minimumShouldMatch) / 100;
+        minMatchesRequired = Math.max(1, Math.ceil(tokens.length * pct));
+      } else {
+        minMatchesRequired = Math.min(tokens.length, Number(options.minimumShouldMatch));
+      }
+    }
+
     let ranked = [...scores.entries()]
-      .filter(([, s]) => s >= minScore)
+      .filter(([id, s]) => {
+        if (s < minScore) return false;
+        const matchedCount = matchedQueryTokens.get(id)?.size ?? 0;
+        return matchedCount >= minMatchesRequired;
+      })
       .map(([id, s]) => {
         let boosted = s;
+        // Completeness boost when document matches all distinct query terms
+        const matchedCount = matchedQueryTokens.get(id)?.size ?? 0;
+        if (tokens.length > 1 && matchedCount === tokens.length) {
+          boosted *= 1.35;
+        }
         // Exact Phrase Boost
         if (!hasWildcard && tokens.length > 1) {
           const doc = this.documents.get(id);

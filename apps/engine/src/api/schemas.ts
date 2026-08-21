@@ -153,3 +153,52 @@ export const updateByQuerySchema = z.object({
   }),
   maxDocs: z.number().int().min(1).max(1000).optional(),
 });
+
+export const autocompleteSchema = z.object({
+  q: z.string().min(1),
+  fields: z.array(z.string()).optional(),
+  size: z.number().int().min(1).max(50).optional(),
+  includeCategories: z.boolean().optional(),
+  includeDocuments: z.boolean().optional(),
+  includeVisualTags: z.boolean().optional(),
+  includeGraphEntities: z.boolean().optional(),
+});
+
+export const imageMetadataSchema = z.object({
+  image: z.string().optional(),
+  bufferBase64: z.string().optional(),
+}).refine((data) => Boolean(data.image || data.bufferBase64), {
+  message: "Either 'image' URL or 'bufferBase64' string must be provided.",
+});
+
+export const graphEntitySchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  type: z.string().min(1),
+  aliases: z.array(z.string()).optional(),
+  properties: z.record(z.unknown()).optional(),
+  docIds: z.array(z.string()).optional(),
+});
+
+export const graphEntitiesSchema = z.object({
+  entities: z.array(graphEntitySchema).min(1),
+});
+
+export const graphTripleSchema = z.object({
+  subject: z.string().min(1),
+  predicate: z.string().min(1),
+  object: z.string().min(1),
+  weight: z.number().optional(),
+});
+
+export const graphTriplesSchema = z.object({
+  triples: z.array(graphTripleSchema).min(1),
+});
+
+export const graphSearchSchema = z.object({
+  query: z.string().min(1),
+  maxHops: z.number().int().min(1).max(5).optional(),
+  types: z.array(z.string()).optional(),
+  limit: z.number().int().min(1).max(50).optional(),
+});
+
