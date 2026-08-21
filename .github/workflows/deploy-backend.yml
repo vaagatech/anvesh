@@ -59,15 +59,18 @@ jobs:
           username: ${{ secrets.OCIR_USERNAME }}
           password: ${{ secrets.OCIR_AUTH_TOKEN }}
 
+      - name: Backup Current Latest to Previous Tag in OCIR
+        run: |
+          docker buildx imagetools create -t ${{ env.OCIR_REGISTRY }}/${{ env.OCIR_REPO }}:previous ${{ env.OCIR_REGISTRY }}/${{ env.OCIR_REPO }}:latest || true
+
       - name: Build and Push Docker Image to OCIR
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           tags: |
-            ${{ env.OCIR_REGISTRY }}/${{ env.OCIR_REPO }}:0.1.0
-            ${{ env.OCIR_REGISTRY }}/${{ env.OCIR_REPO }}:${{ github.sha }}
             ${{ env.OCIR_REGISTRY }}/${{ env.OCIR_REPO }}:latest
+            ${{ env.OCIR_REGISTRY }}/${{ env.OCIR_REPO }}:0.1.0
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -114,7 +117,23 @@ jobs:
           scp -i ~/.ssh/id_rsa infra/k8s/anvesh-k8s.yaml ubuntu@${{ secrets.K3S_HOST }}:~/searchengine/infra/k8s/anvesh-k8s.yaml
           ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.K3S_HOST }} "sudo kubectl apply -f ~/searchengine/infra/k8s/anvesh-k8s.yaml"
 
-      - name: Rollout Restart & Verify Status
+      - name: Rollout Restart & Verify Status (With Auto-Rollback)
         run: |
-          ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.K3S_HOST }} "sudo kubectl rollout restart deployment/anvesh-engine deployment/anvesh-spider deployment/anvesh-indexer deployment/anvesh-hub -n anvesh && sudo kubectl rollout status deployment/anvesh-engine -n anvesh --timeout=120s"
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.K3S_HOST }} "
+            set -e
+            echo '==> Triggering rollout restart...'
+            sudo kubectl rollout restart deployment/anvesh-engine deployment/anvesh-spider deployment/anvesh-indexer deployment/anvesh-hub -n anvesh
+            
+            echo '==> Verifying rollout health...'
+            if ! sudo kubectl rollout status deployment/anvesh-engine -n anvesh --timeout=120s || \
+               ! sudo kubectl rollout status deployment/anvesh-hub -n anvesh --timeout=120s || \
+               ! sudo kubectl rollout status deployment/anvesh-indexer -n anvesh --timeout=120s || \
+               ! sudo kubectl rollout status deployment/anvesh-spider -n anvesh --timeout=120s; then
+              echo '::error::Deployment rollout verification failed! Rolling back to previous working version...'
+              sudo kubectl rollout undo deployment/anvesh-engine deployment/anvesh-spider deployment/anvesh-indexer deployment/anvesh-hub -n anvesh
+              exit 1
+            fi
+            echo '==> Deployment successful. Pruning dangling host images...'
+            sudo crictl rmi --prune || true
+          "
 
