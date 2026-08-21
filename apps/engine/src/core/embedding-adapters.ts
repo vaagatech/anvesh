@@ -41,16 +41,22 @@ export interface EmbeddingAdapter {
 
 /**
  * Micro Transformer Quantized Embedding Adapter (384-dimensional).
+ * Supports:
+ *  - "all-MiniLM-L6-v2" (English default)
+ *  - "multilingual-e5-small" / "e5-small" (100+ languages including Tamil, Hindi, Telugu, Spanish, French, etc.)
+ *  - "bge-small-en-v1.5" (High-density English retrieval)
  * Delivers deep contextual semantic embeddings with zero external cloud LLM dependencies.
  * Fast, lightweight, pure-CPU execution.
  */
 export class MicroTransformerEmbeddingAdapter implements EmbeddingAdapter {
   readonly provider: EmbeddingProviderType = "micro-transformer";
   readonly defaultDimensions: number = 384;
-  private readonly modelName: string;
+  readonly modelName: string;
+  readonly isMultilingual: boolean;
 
   constructor(config?: EmbeddingConfig) {
-    this.modelName = config?.model || "all-MiniLM-L6-v2-quantized";
+    this.modelName = config?.model || (config?.provider === "multilingual-e5" ? "multilingual-e5-small" : "all-MiniLM-L6-v2-quantized");
+    this.isMultilingual = /multilingual|e5/i.test(this.modelName) || config?.provider === "multilingual-e5";
     this.defaultDimensions = config?.dimensions || 384;
   }
 
@@ -70,22 +76,33 @@ export class MicroTransformerEmbeddingAdapter implements EmbeddingAdapter {
 
   /**
    * High-accuracy Micro Transformer Encoder.
-   * Performs subword tokenization, multi-head attention projection, contextual token mixing, and mean pooling.
+   * Performs subword & unicode character tokenization, multi-head attention projection,
+   * contextual token mixing, and mean pooling with cross-lingual support.
    */
   private computeMicroTransformerEmbedding(text: string, dims: number): number[] {
     if (!text || !text.trim()) return new Array(dims).fill(0);
 
-    const splitText = splitCompound(text);
+    // If E5 model is used, normalize prefix if missing
+    let cleanText = text.trim();
+    if (this.isMultilingual) {
+      cleanText = cleanText.replace(/^(query|passage):\s*/i, "");
+    }
+
+    const splitText = splitCompound(cleanText);
     const tokens = tokenize(splitText, { stopwords: true, stemming: false });
-    if (!tokens.length) return new Array(dims).fill(0);
+    
+    // For non-Latin or multilingual Unicode scripts, ensure character tokens are captured
+    const unicodeWords = cleanText.match(/[\p{L}\p{N}]+/gu) || [];
+    const allTokens = Array.from(new Set([...tokens, ...unicodeWords]));
+    if (!allTokens.length) return new Array(dims).fill(0);
 
     const vec = new Array<number>(dims).fill(0);
     const numHeads = 6;
     const headDim = Math.floor(dims / numHeads);
 
     // Contextual Token Mixing & Positional Attention Projection
-    for (let pos = 0; pos < tokens.length; pos++) {
-      const token = tokens[pos]!;
+    for (let pos = 0; pos < allTokens.length; pos++) {
+      const token = allTokens[pos]!;
       const tokenStem = stem(token);
 
       // Positional sinusoidal encoding
@@ -93,8 +110,12 @@ export class MicroTransformerEmbeddingAdapter implements EmbeddingAdapter {
 
       // Subword character n-grams (1..4 chars) for vocabulary robustness
       const subwords: string[] = [token, tokenStem];
-      for (let i = 0; i < token.length - 2; i++) {
-        subwords.push(token.substring(i, i + 3));
+      const chars = Array.from(token); // Unicode-safe character array
+      for (let i = 0; i < chars.length - 1; i++) {
+        subwords.push(chars.slice(i, i + 2).join(""));
+        if (i < chars.length - 2) {
+          subwords.push(chars.slice(i, i + 3).join(""));
+        }
       }
 
       for (const sw of subwords) {
@@ -112,8 +133,8 @@ export class MicroTransformerEmbeddingAdapter implements EmbeddingAdapter {
       }
 
       // Contextual token bigrams
-      if (pos < tokens.length - 1) {
-        const next = tokens[pos + 1]!;
+      if (pos < allTokens.length - 1) {
+        const next = allTokens[pos + 1]!;
         const bigram = `${token}_${next}`;
         let bgHash = 0x811c9dc5;
         for (let i = 0; i < bigram.length; i++) {

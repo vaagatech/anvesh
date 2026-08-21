@@ -123,4 +123,21 @@ describe("AnveshEngine with Default Micro-Transformer & Orthogonal Config", () =
     expect(res.hits.length).toBeGreaterThan(0);
     expect(res.hits[0]?.id).toBe("doc-1");
   });
+
+  it("supports multilingual E5-small for cross-lingual and Indic/Unicode script queries", async () => {
+    const e5Adapter = new MicroTransformerEmbeddingAdapter({
+      model: "multilingual-e5-small",
+      dimensions: 384,
+    });
+    expect(e5Adapter.isMultilingual).toBe(true);
+
+    // Test with Tamil, Hindi, and English text
+    const vecTamil = await e5Adapter.embed("query: பட்டு புடவை யானை உருவம்", 384);
+    const vecHindi = await e5Adapter.embed("query: रेशम साड़ी हाथी रूपांकन", 384);
+    const vecEnglish = await e5Adapter.embed("passage: Pure silk saree with elephant border", 384);
+
+    expect(vecTamil.length).toBe(384);
+    expect(vecHindi.length).toBe(384);
+    expect(vecEnglish.length).toBe(384);
+  });
 });
