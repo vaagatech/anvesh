@@ -272,9 +272,9 @@ export function SearchPanel({
                   )}
 
                   <div className="search-hit-footer">
-                    {url && (
+                    {typeof url === "string" && url.trim().length > 0 && (
                       <span style={{ fontFamily: "var(--font-mono)", color: "var(--c-brand)" }}>
-                        {String(url)}
+                        {url}
                       </span>
                     )}
                     {hit.distanceKm != null && (
@@ -297,7 +297,7 @@ export function SearchPanel({
               from={from}
               size={size}
               total={total}
-              onPageChange={(next) => void runSearch(next)}
+              onChange={(next: number) => void runSearch(next)}
             />
           </div>
         )}

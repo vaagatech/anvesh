@@ -15,6 +15,8 @@ import { stem, tokenize, splitCompound } from "./analyzer.js";
 export type EmbeddingProviderType =
   | "micro-transformer"
   | "minilm"
+  | "multilingual-e5"
+  | "e5-small"
   | "orthogonal"
   | "local"
   | "openai"
@@ -37,6 +39,25 @@ export interface EmbeddingAdapter {
   embed(text: string, dimensions?: number): Promise<number[]>;
   embedBatch(texts: string[], dimensions?: number): Promise<number[][]>;
   embedSync?(text: string, dimensions?: number): number[];
+}
+
+let onnxPipelinePromise: Promise<any> | null = null;
+
+async function getOnnxPipeline(modelName: string): Promise<any> {
+  if (onnxPipelinePromise) return onnxPipelinePromise;
+  onnxPipelinePromise = (async () => {
+    try {
+      const { pipeline, env } = await import("@xenova/transformers");
+      env.allowLocalModels = true;
+      const hfModel = /multilingual|e5/i.test(modelName)
+        ? "Xenova/multilingual-e5-small"
+        : "Xenova/all-MiniLM-L6-v2";
+      return await pipeline("feature-extraction", hfModel, { quantized: true });
+    } catch {
+      return null;
+    }
+  })();
+  return onnxPipelinePromise;
 }
 
 /**
@@ -66,11 +87,43 @@ export class MicroTransformerEmbeddingAdapter implements EmbeddingAdapter {
   }
 
   async embed(text: string, dimensions?: number): Promise<number[]> {
+    const dims = dimensions || this.defaultDimensions;
+    try {
+      const extractor = await getOnnxPipeline(this.modelName);
+      if (extractor) {
+        let input = text.trim();
+        if (this.isMultilingual && !/^(query|passage):/i.test(input)) {
+          input = `query: ${input}`;
+        }
+        const output = await extractor(input, { pooling: "mean", normalize: true });
+        const arr = Array.from(output.data as Float32Array | number[]);
+        if (arr.length === dims) return arr;
+      }
+    } catch {
+      // Graceful fallback to in-process encoder
+    }
     return this.embedSync(text, dimensions);
   }
 
   async embedBatch(texts: string[], dimensions?: number): Promise<number[][]> {
     const dims = dimensions || this.defaultDimensions;
+    try {
+      const extractor = await getOnnxPipeline(this.modelName);
+      if (extractor) {
+        const results: number[][] = [];
+        for (const t of texts) {
+          let input = t.trim();
+          if (this.isMultilingual && !/^(query|passage):/i.test(input)) {
+            input = `passage: ${input}`;
+          }
+          const output = await extractor(input, { pooling: "mean", normalize: true });
+          results.push(Array.from(output.data as Float32Array | number[]));
+        }
+        if (results.length === texts.length) return results;
+      }
+    } catch {
+      // Graceful fallback
+    }
     return texts.map((t) => this.embedSync(t, dims));
   }
 
@@ -430,6 +483,8 @@ export function createEmbeddingAdapter(config?: EmbeddingConfig): EmbeddingAdapt
       return new CustomHttpEmbeddingAdapter(config || { endpoint: "" });
     case "micro-transformer":
     case "minilm":
+    case "multilingual-e5":
+    case "e5-small":
     default:
       return new MicroTransformerEmbeddingAdapter(config);
   }

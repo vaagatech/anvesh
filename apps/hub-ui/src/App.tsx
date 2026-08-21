@@ -180,7 +180,7 @@ export function App() {
 
   const [authMode, setAuthMode] = useState<AuthMode>("login");
   const [status, setStatus] = useState<string | null>(null);
-  const [tone, setTone] = useState<"ok" | "err" | "">("");
+  const [tone, setTone] = useState<"ok" | "err" | "warn" | "">("");
   const [pending, start] = useTransition();
 
   const [cmdOpen, setCmdOpen] = useState(false);
