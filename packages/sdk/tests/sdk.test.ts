@@ -51,7 +51,7 @@ describe("Anvesh SDK", () => {
     const created = await client.indexes.create({
       name: "products",
       mappings: { title: { type: "text" } },
-      settings: { vectorDimensions: 256, autoEmbed: true },
+      settings: { vectorDimensions: 384, autoEmbed: true },
     });
     expect(created.name).toBe("products");
 

@@ -110,7 +110,7 @@ async function main() {
               description: { type: "text" },
             },
             settings: {
-              vectorDimensions: 256,
+              vectorDimensions: 384,
               autoEmbed: true,
               dynamicMapping: true,
             },

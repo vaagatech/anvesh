@@ -139,7 +139,7 @@ async function ensureIndex(
     const j = (await create.json().catch(() => ({}))) as { message?: string };
     throw new Error(j.message || `Could not create index "${index}" (HTTP ${create.status}).`);
   }
-  pushLog(job, `Created index "${index}" (dynamic schema, vectorDimensions=256).`);
+  pushLog(job, `Created index "${index}" (dynamic schema, vectorDimensions=384).`);
 }
 
 async function bulkToEngine(

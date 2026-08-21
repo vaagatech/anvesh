@@ -421,7 +421,7 @@ export class AnveshEngine {
       await this.createIndex(
         indexName,
         {},
-        { dynamicMapping: true, vectorDimensions: 256 },
+        { dynamicMapping: true, vectorDimensions: 384 },
       );
       return this.require(indexName);
     }

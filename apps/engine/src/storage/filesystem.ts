@@ -151,7 +151,7 @@ export class FilesystemStorage implements StorageAdapter {
       const fallbackDefinition: IndexDefinition = {
         name,
         mappings: {},
-        settings: { dynamicMapping: true, vectorDimensions: 256 },
+        settings: { dynamicMapping: true, vectorDimensions: 384 },
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         docCount: rescued.size,
@@ -188,7 +188,7 @@ export class FilesystemStorage implements StorageAdapter {
     const metaContent = JSON.stringify(
       {
         definition: data.definition,
-        vectorDimensions: data.vectors?.dimensions ?? 256,
+        vectorDimensions: data.vectors?.dimensions ?? 384,
         savedAt: new Date().toISOString(),
       },
       null,
@@ -275,7 +275,7 @@ export class FilesystemStorage implements StorageAdapter {
       },
       vectors: Object.keys(vectorsMap).length
         ? {
-            dimensions: def.settings?.vectorDimensions ?? 256,
+            dimensions: def.settings?.vectorDimensions ?? 384,
             metric: def.settings?.vectorMetric ?? "cosine",
             indexType: def.settings?.vectorIndexType ?? "flat",
             quantization: def.settings?.vectorQuantization ?? "none",

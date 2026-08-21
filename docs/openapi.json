@@ -477,7 +477,7 @@
       "IndexSettings": {
         "type": "object",
         "properties": {
-          "vectorDimensions": { "type": "integer", "example": 512 },
+          "vectorDimensions": { "type": "integer", "example": 384 },
           "vectorMetric": { "type": "string", "enum": ["cosine", "dot_product", "euclidean"] },
           "defaultOperator": { "type": "string", "enum": ["AND", "OR"], "default": "OR" },
           "minimumShouldMatch": { "type": "string", "example": "100%" },

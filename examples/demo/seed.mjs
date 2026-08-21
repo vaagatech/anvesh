@@ -65,7 +65,7 @@ async function ensureIndex() {
       location: { type: "geo_point" },
     },
     settings: {
-      vectorDimensions: 256,
+      vectorDimensions: 384,
       autoEmbed: true,
       hybridKeywordWeight: 0.55,
     },
@@ -75,7 +75,7 @@ async function ensureIndex() {
       `Failed to create index "${indexName}" (HTTP ${created.status}): ${created.json?.message ?? ""}`,
     );
   }
-  console.log(`Created index "${indexName}" (vectorDimensions=256, autoEmbed).`);
+  console.log(`Created index "${indexName}" (vectorDimensions=384, autoEmbed).`);
 }
 
 async function bulkSeed() {

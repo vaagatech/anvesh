@@ -25,10 +25,10 @@ export const WEB_MAPPINGS = {
 };
 
 export const WEB_SETTINGS = {
-  vectorDimensions: 256,
+  vectorDimensions: 384,
   autoEmbed: true,
   dynamicMapping: true,
-};
+} as const;
 
 export async function ensureWebIndex(
   engineUrl: string,

@@ -145,7 +145,7 @@ export const WEB_MAPPINGS = {
 };
 
 export const WEB_SETTINGS = {
-  vectorDimensions: 256,
+  vectorDimensions: 384,
   autoEmbed: true,
   /** Learn new fields from documents (default on in engine too). */
   dynamicMapping: true,
