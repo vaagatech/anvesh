@@ -1,0 +1,42 @@
+# =========================================================================
+# Anvesh Bulk Indexer Microservice Dockerfile
+# High-throughput batch document ingestion & embedding pipeline
+# =========================================================================
+FROM node:24-alpine AS build
+WORKDIR /app
+RUN apk add --no-cache python3 make g++
+
+COPY package.json package-lock.json* turbo.json ./
+COPY packages/shared packages/shared
+COPY packages/plugins packages/plugins
+COPY packages/vaakly packages/vaakly
+COPY apps/engine apps/engine
+COPY apps/indexer apps/indexer
+
+RUN npm install
+RUN npm run build -w @vaagatech/anvesh-shared -w @vaagatech/anvesh-plugins -w @vaagatech/vaakly -w @vaagatech/anvesh-engine -w @vaagatech/anvesh-indexer
+
+FROM node:24-alpine AS runtime
+WORKDIR /app
+RUN apk add --no-cache libstdc++
+
+ENV NODE_ENV=production
+ENV ANVESH_INDEXER_DATA_DIR=/data/indexer
+ENV ANVESH_INDEXER_PORT=3852
+ENV ANVESH_HOST=0.0.0.0
+ENV ANVESH_LOG_PRETTY=0
+
+RUN addgroup -S anvesh && adduser -S anvesh -G anvesh
+COPY --from=build /app/package.json ./
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/packages/shared ./packages/shared
+COPY --from=build /app/packages/plugins ./packages/plugins
+COPY --from=build /app/packages/vaakly ./packages/vaakly
+COPY --from=build /app/apps/engine ./apps/engine
+COPY --from=build /app/apps/indexer ./apps/indexer
+
+RUN mkdir -p /data/indexer /tmp && chown -R anvesh:anvesh /data /tmp /app
+USER anvesh
+WORKDIR /app
+EXPOSE 3852
+CMD ["node", "apps/indexer/dist/cli.js", "serve"]

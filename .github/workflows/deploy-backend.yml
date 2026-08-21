@@ -1,42 +1,119 @@
-name: Backend Deployment (OCIR & K3s)
+name: Backend Deployment (Modular OCIR & K3s)
 
 on:
   push:
     branches: [main, master]
     paths:
-      - "apps/engine/**"
-      - "apps/spider/**"
-      - "apps/indexer/**"
-      - "apps/hub-api/**"
+      - "apps/**"
       - "packages/**"
-      - "infra/k8s/**"
-      - "Dockerfile"
+      - "infra/**"
       - ".github/workflows/deploy-backend.yml"
   workflow_dispatch:
+    inputs:
+      target_service:
+        description: "Service to build and deploy (or 'all')"
+        required: true
+        default: "all"
+        type: choice
+        options:
+          - all
+          - engine
+          - spider
+          - indexer
+          - hub
 
 env:
   OCIR_REGISTRY: "hyd.ocir.io"
-  OCIR_REPO: "axkdaujrafzw/anvesh"
+  OCIR_NAMESPACE: "axkdaujrafzw"
 
 jobs:
+  detect-changes:
+    name: Detect Changed Services
+    runs-on: ubuntu-latest
+    outputs:
+      engine: ${{ steps.filter.outputs.engine == 'true' || github.event_name == 'workflow_dispatch' && (inputs.target_service == 'all' || inputs.target_service == 'engine') }}
+      spider: ${{ steps.filter.outputs.spider == 'true' || github.event_name == 'workflow_dispatch' && (inputs.target_service == 'all' || inputs.target_service == 'spider') }}
+      indexer: ${{ steps.filter.outputs.indexer == 'true' || github.event_name == 'workflow_dispatch' && (inputs.target_service == 'all' || inputs.target_service == 'indexer') }}
+      hub: ${{ steps.filter.outputs.hub == 'true' || github.event_name == 'workflow_dispatch' && (inputs.target_service == 'all' || inputs.target_service == 'hub') }}
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Paths Filter
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            engine:
+              - 'apps/engine/**'
+              - 'packages/shared/**'
+              - 'packages/plugins/**'
+              - 'packages/vaakly/**'
+              - 'infra/docker/Dockerfile.engine'
+              - 'infra/k8s/**'
+              - '.github/workflows/deploy-backend.yml'
+            spider:
+              - 'apps/spider/**'
+              - 'packages/shared/**'
+              - 'infra/docker/Dockerfile.spider'
+              - 'infra/k8s/**'
+              - '.github/workflows/deploy-backend.yml'
+            indexer:
+              - 'apps/indexer/**'
+              - 'apps/engine/**'
+              - 'packages/**'
+              - 'infra/docker/Dockerfile.indexer'
+              - 'infra/k8s/**'
+              - '.github/workflows/deploy-backend.yml'
+            hub:
+              - 'apps/hub-api/**'
+              - 'packages/shared/**'
+              - 'packages/search-adapters/**'
+              - 'infra/docker/Dockerfile.hub'
+              - 'infra/k8s/**'
+              - '.github/workflows/deploy-backend.yml'
+
+      - name: Compute Build Matrix
+        id: set-matrix
+        run: |
+          SERVICES=()
+          
+          IS_DISPATCH="${{ github.event_name == 'workflow_dispatch' }}"
+          TARGET="${{ inputs.target_service }}"
+          
+          if [ "$IS_DISPATCH" = "true" ]; then
+            if [ "$TARGET" = "all" ] || [ "$TARGET" = "engine" ]; then SERVICES+=('{"name":"engine","repo":"anvesh-engine","dockerfile":"infra/docker/Dockerfile.engine","deployment":"anvesh-engine"}'); fi
+            if [ "$TARGET" = "all" ] || [ "$TARGET" = "spider" ]; then SERVICES+=('{"name":"spider","repo":"anvesh-spider","dockerfile":"infra/docker/Dockerfile.spider","deployment":"anvesh-spider"}'); fi
+            if [ "$TARGET" = "all" ] || [ "$TARGET" = "indexer" ]; then SERVICES+=('{"name":"indexer","repo":"anvesh-indexer","dockerfile":"infra/docker/Dockerfile.indexer","deployment":"anvesh-indexer"}'); fi
+            if [ "$TARGET" = "all" ] || [ "$TARGET" = "hub" ]; then SERVICES+=('{"name":"hub","repo":"anvesh-hub","dockerfile":"infra/docker/Dockerfile.hub","deployment":"anvesh-hub"}'); fi
+          else
+            if [ "${{ steps.filter.outputs.engine }}" = "true" ]; then SERVICES+=('{"name":"engine","repo":"anvesh-engine","dockerfile":"infra/docker/Dockerfile.engine","deployment":"anvesh-engine"}'); fi
+            if [ "${{ steps.filter.outputs.spider }}" = "true" ]; then SERVICES+=('{"name":"spider","repo":"anvesh-spider","dockerfile":"infra/docker/Dockerfile.spider","deployment":"anvesh-spider"}'); fi
+            if [ "${{ steps.filter.outputs.indexer }}" = "true" ]; then SERVICES+=('{"name":"indexer","repo":"anvesh-indexer","dockerfile":"infra/docker/Dockerfile.indexer","deployment":"anvesh-indexer"}'); fi
+            if [ "${{ steps.filter.outputs.hub }}" = "true" ]; then SERVICES+=('{"name":"hub","repo":"anvesh-hub","dockerfile":"infra/docker/Dockerfile.hub","deployment":"anvesh-hub"}'); fi
+          fi
+
+          # Default to empty array if no service changed
+          if [ ${#SERVICES[@]} -eq 0 ]; then
+            echo "matrix={\"include\":[]}" >> "$GITHUB_OUTPUT"
+          else
+            JSON=$(IFS=,; echo "[${SERVICES[*]}]")
+            echo "matrix={\"include\":$JSON}" >> "$GITHUB_OUTPUT"
+          fi
+
   build-and-push:
-    name: Build & Push to OCIR
+    name: Build & Push (${{ matrix.name }})
+    needs: detect-changes
+    if: ${{ fromJson(needs.detect-changes.outputs.matrix).include[0] != null }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
-      - name: Setup Node.js 24
-        uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: "npm"
-
-      - name: Install Dependencies & Verify Build
-        run: |
-          npm ci
-          npm run build -w @vaagatech/anvesh-shared -w @vaagatech/anvesh-plugins -w @vaagatech/vaakly -w @vaagatech/anvesh-search-adapters -w @vaagatech/anvesh-engine -w @vaagatech/anvesh-spider -w @vaagatech/anvesh-indexer -w @vaagatech/anvesh-hub-api
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -61,22 +138,26 @@ jobs:
 
       - name: Backup Current Latest to Previous Tag in OCIR
         run: |
-          docker buildx imagetools create -t ${{ env.OCIR_REGISTRY }}/${{ env.OCIR_REPO }}:previous ${{ env.OCIR_REGISTRY }}/${{ env.OCIR_REPO }}:latest || true
+          IMAGE_URI="${{ env.OCIR_REGISTRY }}/${{ env.OCIR_NAMESPACE }}/${{ matrix.repo }}"
+          echo "==> Backing up current $IMAGE_URI:latest to :previous..."
+          docker buildx imagetools create -t "$IMAGE_URI:previous" "$IMAGE_URI:latest" || true
 
       - name: Build and Push Docker Image to OCIR
         uses: docker/build-push-action@v5
         with:
           context: .
+          file: ${{ matrix.dockerfile }}
           push: true
           tags: |
-            ${{ env.OCIR_REGISTRY }}/${{ env.OCIR_REPO }}:latest
-            ${{ env.OCIR_REGISTRY }}/${{ env.OCIR_REPO }}:0.1.0
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+            ${{ env.OCIR_REGISTRY }}/${{ env.OCIR_NAMESPACE }}/${{ matrix.repo }}:latest
+            ${{ env.OCIR_REGISTRY }}/${{ env.OCIR_NAMESPACE }}/${{ matrix.repo }}:0.1.0
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
 
   deploy-k3s:
     name: Rollout to K3s Cluster
-    needs: build-and-push
+    needs: [detect-changes, build-and-push]
+    if: ${{ always() && needs.build-and-push.result == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -117,23 +198,39 @@ jobs:
           scp -i ~/.ssh/id_rsa infra/k8s/anvesh-k8s.yaml ubuntu@${{ secrets.K3S_HOST }}:~/searchengine/infra/k8s/anvesh-k8s.yaml
           ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.K3S_HOST }} "sudo kubectl apply -f ~/searchengine/infra/k8s/anvesh-k8s.yaml"
 
-      - name: Rollout Restart & Verify Status (With Auto-Rollback)
+      - name: Targeted Rollout Restart & Verify Status
         run: |
+          DEPLOYMENTS=()
+          if [ "${{ needs.detect-changes.outputs.engine }}" = "true" ]; then DEPLOYMENTS+=("deployment/anvesh-engine"); fi
+          if [ "${{ needs.detect-changes.outputs.spider }}" = "true" ]; then DEPLOYMENTS+=("deployment/anvesh-spider"); fi
+          if [ "${{ needs.detect-changes.outputs.indexer }}" = "true" ]; then DEPLOYMENTS+=("deployment/anvesh-indexer"); fi
+          if [ "${{ needs.detect-changes.outputs.hub }}" = "true" ]; then DEPLOYMENTS+=("deployment/anvesh-hub"); fi
+          
+          if [ ${#DEPLOYMENTS[@]} -eq 0 ]; then
+            echo "No microservice deployments need to be restarted."
+            exit 0
+          fi
+
+          DEPLOY_LIST="${DEPLOYMENTS[*]}"
+          echo "==> Deploying targets: $DEPLOY_LIST"
+
           ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.K3S_HOST }} "
             set -e
-            echo '==> Triggering rollout restart...'
-            sudo kubectl rollout restart deployment/anvesh-engine deployment/anvesh-spider deployment/anvesh-indexer deployment/anvesh-hub -n anvesh
+            echo '==> Restarting updated microservices...'
+            sudo kubectl rollout restart $DEPLOY_LIST -n anvesh
             
             echo '==> Verifying rollout health...'
-            if ! sudo kubectl rollout status deployment/anvesh-engine -n anvesh --timeout=120s || \
-               ! sudo kubectl rollout status deployment/anvesh-hub -n anvesh --timeout=120s || \
-               ! sudo kubectl rollout status deployment/anvesh-indexer -n anvesh --timeout=120s || \
-               ! sudo kubectl rollout status deployment/anvesh-spider -n anvesh --timeout=120s; then
-              echo '::error::Deployment rollout verification failed! Rolling back to previous working version...'
-              sudo kubectl rollout undo deployment/anvesh-engine deployment/anvesh-spider deployment/anvesh-indexer deployment/anvesh-hub -n anvesh
-              exit 1
-            fi
-            echo '==> Deployment successful. Pruning dangling host images...'
+            for dep in $DEPLOY_LIST; do
+              echo \"Checking status for \$dep...\"
+              if ! sudo kubectl rollout status \$dep -n anvesh --timeout=120s; then
+                echo \"::error::Rollout failed for \$dep! Rolling back to previous working image...\"
+                sudo kubectl rollout undo \$dep -n anvesh
+                exit 1
+              fi
+            done
+            
+            echo '==> Rollout successful. Pruning dangling host images...'
             sudo crictl rmi --prune || true
           "
+
 

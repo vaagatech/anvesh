@@ -1,0 +1,36 @@
+# =========================================================================
+# Anvesh Web Spider / Crawler Microservice Dockerfile
+# Ultra-lightweight crawler worker with LinkeDOM & fast parsing
+# =========================================================================
+FROM node:24-alpine AS build
+WORKDIR /app
+RUN apk add --no-cache python3 make g++
+
+COPY package.json package-lock.json* turbo.json ./
+COPY packages/shared packages/shared
+COPY apps/spider apps/spider
+
+RUN npm install
+RUN npm run build -w @vaagatech/anvesh-shared -w @vaagatech/anvesh-spider
+
+FROM node:24-alpine AS runtime
+WORKDIR /app
+RUN apk add --no-cache libstdc++
+
+ENV NODE_ENV=production
+ENV ANVESH_SPIDER_DATA_DIR=/data/spider
+ENV ANVESH_SPIDER_PORT=3851
+ENV ANVESH_HOST=0.0.0.0
+ENV ANVESH_LOG_PRETTY=0
+
+RUN addgroup -S anvesh && adduser -S anvesh -G anvesh
+COPY --from=build /app/package.json ./
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/packages/shared ./packages/shared
+COPY --from=build /app/apps/spider ./apps/spider
+
+RUN mkdir -p /data/spider /tmp && chown -R anvesh:anvesh /data /tmp /app
+USER anvesh
+WORKDIR /app
+EXPOSE 3851
+CMD ["node", "apps/spider/dist/cli.js", "serve"]
