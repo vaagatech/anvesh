@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import {
-  LocalEmbeddingAdapter,
+  MicroTransformerEmbeddingAdapter,
+  OrthogonalEmbeddingAdapter,
   CustomHttpEmbeddingAdapter,
   createEmbeddingAdapter,
 } from "../src/core/embedding-adapters.js";
@@ -8,27 +9,27 @@ import { AnveshEngine } from "../src/core/engine.js";
 import { MemoryStorage } from "../src/storage/memory.js";
 
 describe("Pluggable Embedding Adapters", () => {
-  it("uses LocalEmbeddingAdapter by default without any LLM or external calls", async () => {
+  it("uses MicroTransformerEmbeddingAdapter by default without any external LLM or cloud API", async () => {
     const adapter = createEmbeddingAdapter();
-    expect(adapter.provider).toBe("local");
+    expect(adapter.provider).toBe("micro-transformer");
 
-    const vec = await adapter.embed("silk saree with elephant motifs", 128);
-    expect(vec.length).toBe(128);
+    const vec = await adapter.embed("silk saree with elephant motifs", 384);
+    expect(vec.length).toBe(384);
 
     // Magnitude should be ~1 (unit vector)
     const norm = Math.sqrt(vec.reduce((sum, v) => sum + v * v, 0));
     expect(norm).toBeCloseTo(1.0, 4);
 
-    const batch = await adapter.embedBatch(["saree", "kurti", "lehenga"], 64);
+    const batch = await adapter.embedBatch(["saree", "kurti", "lehenga"], 384);
     expect(batch.length).toBe(3);
-    expect(batch[0]?.length).toBe(64);
+    expect(batch[0]?.length).toBe(384);
   });
 
-  it("creates LocalEmbeddingAdapter explicitly via config", async () => {
-    const adapter = createEmbeddingAdapter({ provider: "local", dimensions: 256 });
-    expect(adapter.provider).toBe("local");
-    const vec = await adapter.embed("kanjivaram silk", 256);
-    expect(vec.length).toBe(256);
+  it("creates OrthogonalEmbeddingAdapter explicitly via config for zero-overhead projections", async () => {
+    const adapter = createEmbeddingAdapter({ provider: "orthogonal", dimensions: 512 });
+    expect(adapter.provider).toBe("orthogonal");
+    const vec = await adapter.embed("kanjivaram silk", 512);
+    expect(vec.length).toBe(512);
   });
 
   it("handles CustomHttpEmbeddingAdapter with mock endpoint", async () => {
@@ -40,27 +41,39 @@ describe("Pluggable Embedding Adapters", () => {
   });
 });
 
-describe("AnveshEngine with Pluggable Embedding Config", () => {
+describe("AnveshEngine with Default Micro-Transformer & Orthogonal Config", () => {
   let engine: AnveshEngine;
 
   beforeEach(async () => {
     engine = new AnveshEngine(new MemoryStorage());
     await engine.init();
-    await engine.createIndex("catalog", {
-      name: { type: "text" },
-      description: { type: "text" },
+    await engine.createIndex("apparel", {
+      title: { type: "text" },
+      body: { type: "text" },
+    }, {
+      vectorDimensions: 384,
+      autoEmbed: true,
+      embeddingConfig: {
+        provider: "micro-transformer",
+        dimensions: 384,
+      },
+    });
+
+    await engine.createIndex("fast_index", {
+      title: { type: "text" },
+      body: { type: "text" },
     }, {
       vectorDimensions: 256,
       autoEmbed: true,
       embeddingConfig: {
-        provider: "local",
+        provider: "orthogonal",
         dimensions: 256,
       },
     });
   });
 
-  it("indexes and performs semantic search using pluggable local adapter without LLM", async () => {
-    await engine.indexDocument("catalog", {
+  it("indexes and performs semantic search using default Micro Transformer", async () => {
+    await engine.indexDocument("apparel", {
       id: "doc-1",
       fields: {
         title: "Kanjivaram Silk Saree",
@@ -68,7 +81,7 @@ describe("AnveshEngine with Pluggable Embedding Config", () => {
       },
     });
 
-    await engine.indexDocument("catalog", {
+    await engine.indexDocument("apparel", {
       id: "doc-2",
       fields: {
         title: "Cotton Casual Shirt",
@@ -76,13 +89,38 @@ describe("AnveshEngine with Pluggable Embedding Config", () => {
       },
     });
 
-    const res = await engine.search("catalog", {
+    const res = await engine.search("apparel", {
       q: "wedding silk garment",
       mode: "semantic",
     });
 
     expect(res.hits.length).toBeGreaterThan(0);
-    // doc-1 (silk saree) should be ranked first
+    expect(res.hits[0]?.id).toBe("doc-1");
+  });
+
+  it("indexes and performs semantic search using pure-CPU Orthogonal projections", async () => {
+    await engine.indexDocument("fast_index", {
+      id: "doc-1",
+      fields: {
+        title: "Kanjivaram Silk Saree",
+        body: "Traditional handwoven wedding silk garment with golden zari motifs.",
+      },
+    });
+
+    await engine.indexDocument("fast_index", {
+      id: "doc-2",
+      fields: {
+        title: "Cotton Casual Shirt",
+        body: "Office wear breathable fabric.",
+      },
+    });
+
+    const res = await engine.search("fast_index", {
+      q: "wedding silk garment",
+      mode: "semantic",
+    });
+
+    expect(res.hits.length).toBeGreaterThan(0);
     expect(res.hits[0]?.id).toBe("doc-1");
   });
 });
