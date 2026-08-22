@@ -36,6 +36,7 @@
 - ⚡ **Hybrid Search & Vector Retrieval**: BM25 inverted index combined with dense vector semantic search using Reciprocal Rank Fusion (RRF) and cosine / euclidean / dot product distance.
 - 🎨 **Non-AI Visual & OCR Feature Extractor**: Extracts text/labels via local OCR (`tesseract.js`), dominant color palettes (e.g. `"Gold Zari"`, `"Royal Blue"`), and pattern/motif edge descriptors (`"Peacock/Elephant Motif"`, `"Checks"`, `"Temple Border"`) without external cloud AI dependencies.
 - 📐 **Semantic Synonyms & Bounded Highlighting**: Intelligent query term expansion with strict 240-character sentence-boundary snippet truncation for search results.
+- 🎯 **Field Projections & Granular Selection**: High-performance field inclusion (`{ title: 1, price: 1 }`), exclusion (`{ body: 0 }`), dot-notation nested paths, and document ID control.
 - ⚙️ **Config-as-Code & GitOps**: Complete declarative schema management via `anvesh plan`, `anvesh apply`, and `/v1/config/*` APIs without pod redeployments.
 - 🛡️ **3-Tier Throttling & Concurrency Protection**: Rate limiting (`ANVESH_RATE_LIMIT`), in-flight simultaneous query slots (`ANVESH_MAX_CONCURRENT_SEARCH`), and memory heap backpressure guards (`ERR_CIRCUIT_MEMORY`).
 - 📉 **SQ8 Vector Quantization**: 8-bit scalar quantization reducing vector RAM footprint by 75% with >98% recall accuracy.
@@ -68,11 +69,12 @@ const client = new AnveshClient({
   },
 });
 
-// Run hybrid search
+// Run hybrid search with field projection
 const results = await client.search("products", {
   q: "festive silk saree with elephant zari",
   mode: "hybrid",
   highlight: true,
+  projection: { title: 1, price: 1, "meta.brand": 1 },
 });
 
 console.log(`Found ${results.total} products:`, results.hits);

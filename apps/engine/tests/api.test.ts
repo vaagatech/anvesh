@@ -124,4 +124,42 @@ describe("API", () => {
     expect(invoked.statusCode).toBe(200);
     expect(invoked.json().result.message).toContain("2 matching documents");
   });
+
+  it("supports projection selection via POST and GET search and document APIs", async () => {
+    const headers = { authorization: "Bearer test-key" };
+
+    // POST /search with MongoDB-style projection
+    const postSearch = await app.inject({
+      method: "POST",
+      url: "/v1/indexes/docs/search",
+      headers,
+      payload: {
+        q: "Hello",
+        projection: { title: 1 },
+      },
+    });
+    expect(postSearch.statusCode).toBe(200);
+    const postBody = postSearch.json();
+    expect(postBody.hits[0].source.fields).toEqual({ title: "Hello Anvesh" });
+    expect(postBody.hits[0].source.fields.body).toBeUndefined();
+
+    // GET /search with ?select=title
+    const getSearch = await app.inject({
+      method: "GET",
+      url: "/v1/indexes/docs/search?q=Hello&select=title",
+      headers,
+    });
+    expect(getSearch.statusCode).toBe(200);
+    const getBody = getSearch.json();
+    expect(getBody.hits[0].source.fields).toEqual({ title: "Hello Anvesh" });
+
+    // GET /documents/:id with ?projection={"title":1}
+    const getDoc = await app.inject({
+      method: "GET",
+      url: "/v1/indexes/docs/documents/1?select=title",
+      headers,
+    });
+    expect(getDoc.statusCode).toBe(200);
+    expect(getDoc.json().document.fields).toEqual({ title: "Hello Anvesh" });
+  });
 });

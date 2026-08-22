@@ -36,11 +36,11 @@ Mode is auto-detected when omitted:
 
 ## Fuzzy, phrase, and prefix
 
-Typos and match styles map to Elasticsearch-like options:
+Typos and match style options:
 
 | Option | Effect |
 |--------|--------|
-| `fuzziness: "AUTO"` | ES-style AUTO: 0 edits for ≤2 chars, 1 for ≤5, else 2 |
+| `fuzziness: "AUTO"` | Adaptive distance: 0 edits for ≤2 chars, 1 for ≤5, else 2 |
 | `fuzziness: 0 \| 1 \| 2` | Fixed edit distance |
 | `phrase: true` | Ordered term match |
 | `phraseSlop: 2` | Allowed gaps between phrase terms (0–10) |
@@ -156,6 +156,67 @@ Tune with index setting `hybridKeywordWeight` (0–1, default 0.5).
 
 Any mode can include a `geo` object to restrict candidates (and attach `distanceKm` when `origin` is set). See [Geo search]({{ '/guides/geo/' | relative_url }}).
 
+## Field projections & selection
+
+Control which fields are returned in hit sources to save network bandwidth and payload size.
+
+### 1. Projection objects (inclusion & exclusion)
+```json
+{
+  "q": "running shoes",
+  "projection": { "title": 1, "price": 1, "meta.brand": 1 }
+}
+```
+
+Exclusion syntax:
+```json
+{
+  "q": "running shoes",
+  "projection": { "body": 0, "rawHtml": 0 }
+}
+```
+
+Document ID suppression:
+```json
+{
+  "q": "running shoes",
+  "projection": { "title": 1, "id": 0 }
+}
+```
+
+### 2. Array and list shortcuts
+```json
+{
+  "q": "running shoes",
+  "select": ["title", "price", "meta.brand"]
+}
+```
+
+### 3. Source filtering (`_source`)
+```json
+{
+  "q": "running shoes",
+  "_source": {
+    "includes": ["title*", "meta.*"],
+    "excludes": ["internal_*"]
+  }
+}
+```
+
+Or omit source completely (returning only hit metadata & scores):
+```json
+{
+  "q": "running shoes",
+  "_source": false
+}
+```
+
+### 4. GET query parameter selection
+```bash
+curl "http://127.0.0.1:3848/v1/indexes/products/search?q=shoes&select=title,price"
+curl "http://127.0.0.1:3848/v1/indexes/products/documents/123?select=title,price"
+```
+
 ## Response shape
 
 ```json
@@ -169,7 +230,7 @@ Any mode can include a `geo` object to restrict candidates (and attach `distance
     {
       "id": "1",
       "score": 2.1,
-      "source": { "id": "1", "fields": { } },
+      "source": { "id": "1", "fields": { "title": "Red running shoes", "price": 89 } },
       "highlight": { "body": ["…"] },
       "distanceKm": 1.4
     }

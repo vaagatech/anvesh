@@ -55,4 +55,12 @@ describe("Solr mapper", () => {
     expect(result.hits[0]?.source.fields.title).toBe("Hello");
     expect(result.hits[0]?.source.fields._version_).toBeUndefined();
   });
+
+  it("maps projection into Solr fl parameter", () => {
+    const params = mapAnveshQueryToSolr({
+      q: "test",
+      projection: { title: 1, price: 1 },
+    });
+    expect(params.fl).toBe("id,title,price");
+  });
 });

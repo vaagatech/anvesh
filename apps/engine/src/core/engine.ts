@@ -16,7 +16,7 @@ import {
   expandMappingsFromFields,
 } from "./dynamic-mapping.js";
 import { AnveshError, formatMessage } from "../messaging/vaakly.js";
-import { globalDeadLetter, globalResourceGuard, type DeadLetterEntry } from "@vaagatech/anvesh-shared";
+import { globalDeadLetter, globalResourceGuard, projectDocument, type DeadLetterEntry } from "@vaagatech/anvesh-shared";
 import { KnowledgeGraphStore, type GraphEntity, type GraphTriple, type GraphNeighborhood, type GraphSearchResult } from "./knowledge-graph.js";
 import { buildAutocompleteSuggestions, type AutocompleteSuggestion, type AutocompleteOptions } from "./autocomplete.js";
 import type { StorageAdapter } from "../storage/types.js";
@@ -390,8 +390,16 @@ export class AnveshEngine {
     return this.normalizeFields(state.definition.mappings, coerced);
   }
 
-  private publicDoc(doc: AnveshDocument): AnveshDocument {
+  private publicDoc(
+    doc: AnveshDocument,
+    projection?: any,
+    includeFields?: string[],
+    excludeFields?: string[],
+  ): AnveshDocument {
     const { vector: _v, ...rest } = doc;
+    if (projection !== undefined || includeFields?.length || excludeFields?.length) {
+      return projectDocument(rest, projection, includeFields, excludeFields);
+    }
     return rest;
   }
 
@@ -598,16 +606,28 @@ export class AnveshEngine {
     await this.flush(indexName);
   }
 
-  getDocument(indexName: string, id: DocumentId): AnveshDocument {
+  getDocument(
+    indexName: string,
+    id: DocumentId,
+    projection?: any,
+    includeFields?: string[],
+    excludeFields?: string[],
+  ): AnveshDocument {
     const state = this.require(indexName);
     const doc = state.inverted.get(id);
     if (!doc) throw new AnveshError("ERR_DOC_NOT_FOUND", { index: indexName, id });
-    return doc;
+    return this.publicDoc(doc, projection, includeFields, excludeFields);
   }
 
   listDocuments(
     indexName: string,
-    opts: { from?: number; size?: number } = {},
+    opts: {
+      from?: number;
+      size?: number;
+      projection?: any;
+      includeFields?: string[];
+      excludeFields?: string[];
+    } = {},
   ): { total: number; documents: AnveshDocument[] } {
     const state = this.require(indexName);
     const from = opts.from ?? 0;
@@ -617,10 +637,7 @@ export class AnveshEngine {
     const documents = slice
       .map((id) => state.inverted.get(id))
       .filter((d): d is AnveshDocument => Boolean(d))
-      .map((d) => {
-        const { vector: _v, ...rest } = d;
-        return rest;
-      });
+      .map((d) => this.publicDoc(d, opts.projection, opts.includeFields, opts.excludeFields));
     return { total: ids.length, documents };
   }
 
@@ -958,8 +975,14 @@ export class AnveshEngine {
       });
     }
 
-    // Keyword / geo hits may still carry stored vectors — strip before response
-    if (mode === "keyword" || mode === "geo") {
+    // Apply publicDoc and field projection to search hits
+    const projSpec = query.projection ?? query.select ?? query.returnFields ?? query._source;
+    if (projSpec !== undefined || query.includeFields?.length || query.excludeFields?.length) {
+      hits = hits.map((h) => ({
+        ...h,
+        source: this.publicDoc(h.source, projSpec, query.includeFields, query.excludeFields),
+      }));
+    } else if (mode === "keyword" || mode === "geo") {
       hits = hits.map((h) => ({ ...h, source: this.publicDoc(h.source) }));
     }
 

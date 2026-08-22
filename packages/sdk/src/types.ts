@@ -74,7 +74,29 @@ export interface SearchQuery {
   minScore?: number;
   boosts?: Record<string, number>;
   operator?: "AND" | "OR";
+  /** Minimum percentage or count of query tokens that must match (e.g. "100%", "75%", 2). */
   minimumShouldMatch?: string | number;
+  /** MongoDB-style projection spec (e.g. { title: 1, price: 1, _id: 0 } or { body: 0 } or ["title", "price"]). */
+  projection?:
+    | Record<string, number | boolean>
+    | string[]
+    | string
+    | boolean
+    | { includes?: string[]; excludes?: string[] };
+  /** SQL/REST alias for field projection. */
+  select?: string[] | string | Record<string, number | boolean>;
+  /** Elasticsearch _source filter alias. */
+  _source?:
+    | boolean
+    | string[]
+    | string
+    | { includes?: string[]; excludes?: string[] };
+  /** Explicit list of return fields. */
+  returnFields?: string[];
+  /** Explicit list of fields to include in projection. */
+  includeFields?: string[];
+  /** Explicit list of fields to exclude from projection. */
+  excludeFields?: string[];
   [key: string]: any;
 }
 

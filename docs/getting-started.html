@@ -110,10 +110,11 @@ await client.documents.index("products", {
   },
 });
 
-// 3. Search
+// 3. Search (with optional field projection)
 const results = await client.search("products", {
   q: "silk saree",
   mode: "hybrid",
+  projection: { title: 1, price: 1, "meta.brand": 1 },
 });
 console.log(results.hits);</code></pre>
 

@@ -46,6 +46,15 @@
           <li><strong>Hybrid mode</strong> — fuse both signals via RRF with configurable <code>alpha</code> weighting</li>
         </ul>
 
+        <h2>Field Projections & Granular Selection</h2>
+        <p>Optimize payload sizes and network bandwidth by retrieving only the exact fields your client application requires:</p>
+        <ul>
+          <li><strong>Inclusion & Exclusion Objects</strong> — select fields with <code>{ title: 1, price: 1 }</code> or exclude large blobs with <code>{ body: 0 }</code></li>
+          <li><strong>Nested Paths & Dot Notation</strong> — cherry-pick nested sub-documents (e.g. <code>"specs.dimensions.weight": 1</code>) without shape distortion</li>
+          <li><strong>Document ID Control</strong> — retain or suppress document identifiers with <code>{ id: 0 }</code></li>
+          <li><strong>REST & Query Shortcuts</strong> — pass concise field arrays (<code>["title", "price"]</code>) or URL query parameters (<code>?select=title,price</code>)</li>
+        </ul>
+
         <h2>Tiered Object Storage</h2>
         <p>Anvesh automatically tiers data between fast local NVMe and cheap object storage:</p>
         <ul>

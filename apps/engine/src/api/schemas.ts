@@ -125,6 +125,39 @@ export const searchSchema = z.object({
   mustNot: z
     .array(z.object({ field: z.string(), value: z.union([z.string(), z.number(), z.boolean()]) }))
     .optional(),
+  projection: z
+    .union([
+      z.record(z.union([z.number(), z.boolean(), z.string()])),
+      z.array(z.string()),
+      z.string(),
+      z.boolean(),
+      z.object({
+        includes: z.array(z.string()).optional(),
+        excludes: z.array(z.string()).optional(),
+      }),
+    ])
+    .optional(),
+  select: z
+    .union([
+      z.array(z.string()),
+      z.string(),
+      z.record(z.union([z.number(), z.boolean(), z.string()])),
+    ])
+    .optional(),
+  _source: z
+    .union([
+      z.boolean(),
+      z.array(z.string()),
+      z.string(),
+      z.object({
+        includes: z.array(z.string()).optional(),
+        excludes: z.array(z.string()).optional(),
+      }),
+    ])
+    .optional(),
+  returnFields: z.array(z.string()).optional(),
+  includeFields: z.array(z.string()).optional(),
+  excludeFields: z.array(z.string()).optional(),
 });
 
 export const suggestSchema = z.object({

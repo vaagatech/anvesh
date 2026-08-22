@@ -13,6 +13,12 @@ import {
 } from "./dynamic.js";
 
 export type { FieldMapping } from "./types.js";
+export type {
+  NormalizedProjection,
+  ProjectionRule,
+  ProjectionSpec,
+  SourceFilterObject,
+} from "./projection.js";
 export {
   expandMappingsFromFields,
   hostFromUrl,
@@ -24,6 +30,10 @@ export {
   pathFromUrl,
   wordCount,
 } from "./dynamic.js";
+export {
+  normalizeProjection,
+  projectDocument,
+} from "./projection.js";
 
 export const crawlRoleSchema = z.object({
   /** Role name used for tagging pages (e.g. guest, user, admin). */

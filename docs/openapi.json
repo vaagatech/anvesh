@@ -505,7 +505,15 @@
           "operator": { "type": "string", "enum": ["AND", "OR"] },
           "minimumShouldMatch": { "type": "string", "example": "100%" },
           "highlight": { "type": "boolean", "default": true },
-          "size": { "type": "integer", "default": 10 }
+          "size": { "type": "integer", "default": 10 },
+          "projection": {
+            "description": "Field projection spec for selecting or excluding fields in hit sources",
+            "example": { "title": 1, "price": 1, "meta.brand": 1 }
+          },
+          "select": {
+            "description": "Concise field list shortcut for projection",
+            "example": ["title", "price"]
+          }
         }
       },
       "SearchResult": {

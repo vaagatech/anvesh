@@ -125,6 +125,35 @@ export function mapAnveshQueryToElasticsearch(query: AnveshSearchQuery): Record<
     size: query.size ?? 10,
   };
 
+  const projSpec = query.projection ?? query.select ?? query.returnFields ?? query._source;
+  if (projSpec !== undefined) {
+    if (typeof projSpec === "boolean") {
+      body._source = projSpec;
+    } else if (Array.isArray(projSpec)) {
+      body._source = projSpec;
+    } else if (typeof projSpec === "string") {
+      body._source = projSpec.split(/[,\s]+/).map((s) => s.trim()).filter(Boolean);
+    } else if (typeof projSpec === "object" && projSpec !== null) {
+      if ("includes" in projSpec || "excludes" in projSpec) {
+        body._source = projSpec;
+      } else {
+        const includes: string[] = [];
+        const excludes: string[] = [];
+        for (const [k, v] of Object.entries(projSpec)) {
+          if (v === 1 || v === true || v === "1" || v === "true") includes.push(k);
+          else if (v === 0 || v === false || v === "0" || v === "false") excludes.push(k);
+        }
+        if (includes.length && excludes.length) {
+          body._source = { includes, excludes };
+        } else if (includes.length) {
+          body._source = includes;
+        } else if (excludes.length) {
+          body._source = { excludes };
+        }
+      }
+    }
+  }
+
   if (Object.keys(bool).length) {
     body.query = { bool };
   } else {

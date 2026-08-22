@@ -87,6 +87,26 @@ export function mapAnveshQueryToSolr(query: AnveshSearchQuery): Record<string, s
   }
   if (fq.length) params.fq = fq.join(" AND ");
 
+  const projSpec = query.projection ?? query.select ?? query.returnFields ?? query._source;
+  if (projSpec !== undefined) {
+    if (Array.isArray(projSpec)) {
+      params.fl = ["id", ...projSpec.filter((f) => f !== "id" && f !== "_id")].join(",");
+    } else if (typeof projSpec === "string") {
+      params.fl = projSpec;
+    } else if (typeof projSpec === "object" && projSpec !== null) {
+      if ("includes" in projSpec && Array.isArray((projSpec as any).includes)) {
+        params.fl = ["id", ...(projSpec as any).includes].join(",");
+      } else {
+        const includes = Object.entries(projSpec)
+          .filter(([_, v]) => v === 1 || v === true || v === "1" || v === "true")
+          .map(([k]) => k);
+        if (includes.length) {
+          params.fl = ["id", ...includes.filter((f) => f !== "id" && f !== "_id")].join(",");
+        }
+      }
+    }
+  }
+
   return params;
 }
 

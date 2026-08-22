@@ -284,6 +284,93 @@ describe("dynamic mapping", () => {
     const resOr = engine.search("apparel", { q: "saree elephant", mode: "keyword", operator: "OR" });
     expect(resOr.total).toBe(3);
   });
+
+  it("supports MongoDB-style field projections on search hits", async () => {
+    const engine = new AnveshEngine(new MemoryStorage());
+    await engine.init();
+    await engine.createIndex("products", {
+      title: { type: "text" },
+      description: { type: "text" },
+      category: { type: "keyword" },
+      price: { type: "number" },
+      stock: { type: "number" },
+    });
+
+    await engine.indexDocument("products", {
+      id: "proj-1",
+      fields: {
+        title: "Mechanical Keyboard",
+        description: "RGB clicky switches with hot swap PCB",
+        category: "electronics",
+        price: 129.99,
+        stock: 50,
+      },
+      meta: {
+        supplier: { name: "Keychron", location: "Global" },
+        tags: ["gaming", "typing"],
+      },
+    });
+
+    // 1. Inclusion projection: { title: 1, price: 1 }
+    const resInc = engine.search("products", {
+      q: "keyboard",
+      projection: { title: 1, price: 1 },
+    });
+    expect(resInc.total).toBe(1);
+    expect(resInc.hits[0]!.id).toBe("proj-1");
+    expect(resInc.hits[0]!.source.fields).toEqual({
+      title: "Mechanical Keyboard",
+      price: 129.99,
+    });
+    expect(resInc.hits[0]!.source.meta).toBeUndefined();
+
+    // 2. Exclusion projection: { description: 0, category: 0 }
+    const resExc = engine.search("products", {
+      q: "keyboard",
+      projection: { description: 0, category: 0 },
+    });
+    expect(resExc.hits[0]!.source.fields.title).toBe("Mechanical Keyboard");
+    expect(resExc.hits[0]!.source.fields.price).toBe(129.99);
+    expect(resExc.hits[0]!.source.fields.stock).toBe(50);
+    expect(resExc.hits[0]!.source.fields.description).toBeUndefined();
+    expect(resExc.hits[0]!.source.fields.category).toBeUndefined();
+
+    // 3. Nested projection: { title: 1, "meta.supplier.name": 1 }
+    const resNest = engine.search("products", {
+      q: "keyboard",
+      projection: { title: 1, "meta.supplier.name": 1 },
+    });
+    expect(resNest.hits[0]!.source.fields).toEqual({ title: "Mechanical Keyboard" });
+    expect(resNest.hits[0]!.source.meta).toEqual({
+      supplier: { name: "Keychron" },
+    });
+
+    // 4. Document ID suppression: { title: 1, id: 0 }
+    const resNoId = engine.search("products", {
+      q: "keyboard",
+      projection: { title: 1, id: 0 },
+    });
+    expect(resNoId.hits[0]!.id).toBe("proj-1"); // Hit envelope has id
+    expect(resNoId.hits[0]!.source.id).toBeUndefined(); // Hit source suppressed id
+    expect(resNoId.hits[0]!.source.fields).toEqual({ title: "Mechanical Keyboard" });
+
+    // 5. Select alias: ["title", "price"]
+    const resSelect = engine.search("products", {
+      q: "keyboard",
+      select: ["title", "price"],
+    });
+    expect(resSelect.hits[0]!.source.fields).toEqual({
+      title: "Mechanical Keyboard",
+      price: 129.99,
+    });
+
+    // 6. Elasticsearch _source: false alias
+    const resNoSource = engine.search("products", {
+      q: "keyboard",
+      _source: false,
+    });
+    expect(resNoSource.hits[0]!.source.fields).toEqual({});
+  });
 });
 
 describe("circuit breakers", () => {

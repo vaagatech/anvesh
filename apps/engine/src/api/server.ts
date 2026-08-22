@@ -550,10 +550,30 @@ export async function createAnveshApp(options: AnveshServerOptions = {}): Promis
     }
   });
 
+  function parseProjectionParam(raw: unknown): any {
+    if (!raw) return undefined;
+    if (typeof raw === "string") {
+      const trimmed = raw.trim();
+      if (
+        (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+        (trimmed.startsWith("[") && trimmed.endsWith("]"))
+      ) {
+        try {
+          return JSON.parse(trimmed);
+        } catch {
+          // fallback to comma-separated string
+        }
+      }
+    }
+    return raw;
+  }
+
   app.get("/v1/indexes/:name/documents/:id", async (req, reply) => {
     try {
       const { name, id } = req.params as { name: string; id: string };
-      const document = engine.getDocument(name, id);
+      const q = req.query as Record<string, string | undefined>;
+      const proj = parseProjectionParam(q.projection ?? q.select ?? q.returnFields ?? q._source ?? q.fields);
+      const document = engine.getDocument(name, id, proj);
       return { ok: true, message: `Document \"${id}\" retrieved.`, document };
     } catch (err) {
       return sendError(reply, err, req.requestId);
@@ -563,10 +583,12 @@ export async function createAnveshApp(options: AnveshServerOptions = {}): Promis
   app.get("/v1/indexes/:name/documents", async (req, reply) => {
     try {
       const { name } = req.params as { name: string };
-      const q = req.query as { from?: string; size?: string };
+      const q = req.query as Record<string, string | undefined>;
+      const proj = parseProjectionParam(q.projection ?? q.select ?? q.returnFields ?? q._source ?? q.fields);
       const result = engine.listDocuments(name, {
         from: q.from ? Number(q.from) : 0,
         size: q.size ? Number(q.size) : 20,
+        projection: proj,
       });
       return {
         ok: true,
@@ -601,6 +623,38 @@ export async function createAnveshApp(options: AnveshServerOptions = {}): Promis
       return apiEnvelope("OK_DOC_DELETED", {}, { index: name, id });
     } catch (err) {
       return sendError(reply, err, req.requestId);
+    }
+  });
+
+  app.get("/v1/indexes/:name/search", async (req, reply) => {
+    try {
+      const { name } = req.params as { name: string };
+      const q = req.query as Record<string, any>;
+      const proj = parseProjectionParam(q.projection ?? q.select ?? q.returnFields ?? q._source);
+      const queryObj: any = {
+        q: q.q,
+        mode: q.mode,
+        from: q.from ? Number(q.from) : undefined,
+        size: q.size ? Number(q.size) : undefined,
+        highlight: q.highlight === "true" || q.highlight === true,
+        projection: proj,
+      };
+      if (q.fields) {
+        queryObj.fields = typeof q.fields === "string" ? q.fields.split(",").map((s: string) => s.trim()) : q.fields;
+      }
+      const parsed = searchSchema.parse(queryObj);
+      const result = await globalCircuits.withSearchSlot(() => {
+        globalCircuits.checkResultWindow(parsed.from ?? 0, parsed.size ?? 10);
+        return engine.search(name, {
+          ...parsed,
+          maxFuzzyCandidates: globalCircuits.config.maxFuzzyCandidates,
+        });
+      });
+      return { ok: true, code: "OK_SEARCH" as const, ...result };
+    } catch (err) {
+      return sendError(reply, err instanceof Error && err.name === "ZodError"
+        ? new AnveshError("ERR_VALIDATION", { detail: err.message })
+        : err, req.requestId);
     }
   });
 

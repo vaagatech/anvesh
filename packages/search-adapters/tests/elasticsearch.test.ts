@@ -93,4 +93,27 @@ describe("Elasticsearch mapper", () => {
     expect(result.hits[0]?.id).toBe("1");
     expect(result.hits[0]?.source.fields.title).toBe("Hello");
   });
+
+  it("maps MongoDB-style projections and _source filters into Elasticsearch _source", () => {
+    // Inclusion projection object
+    const body1 = mapAnveshQueryToElasticsearch({
+      q: "test",
+      projection: { title: 1, price: 1 },
+    });
+    expect(body1._source).toEqual(["title", "price"]);
+
+    // Exclusion projection object
+    const body2 = mapAnveshQueryToElasticsearch({
+      q: "test",
+      projection: { body: 0, internalSecret: 0 },
+    });
+    expect(body2._source).toEqual({ excludes: ["body", "internalSecret"] });
+
+    // Explicit _source: false
+    const body3 = mapAnveshQueryToElasticsearch({
+      q: "test",
+      _source: false,
+    });
+    expect(body3._source).toBe(false);
+  });
 });

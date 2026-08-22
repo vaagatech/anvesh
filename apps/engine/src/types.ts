@@ -231,6 +231,30 @@ export interface SearchQuery {
   operator?: "AND" | "OR";
   /** Minimum percentage or count of query tokens that must match (e.g. "100%", "75%", 2). */
   minimumShouldMatch?: string | number;
+  /**
+   * MongoDB-style projection spec (e.g. { title: 1, price: 1, _id: 0 } or { body: 0 } or ["title", "price"]).
+   * Controls which fields are returned in hit sources.
+   */
+  projection?:
+    | Record<string, number | boolean | string>
+    | string[]
+    | string
+    | boolean
+    | { includes?: string[]; excludes?: string[] };
+  /** SQL/REST alias for field projection (e.g. ["title", "price"] or "title,price"). */
+  select?: string[] | string | Record<string, number | boolean | string>;
+  /** Elasticsearch _source filter alias (e.g. false | ["title*"] | { includes: [...], excludes: [...] }). */
+  _source?:
+    | boolean
+    | string[]
+    | string
+    | { includes?: string[]; excludes?: string[] };
+  /** Explicit list of return fields. */
+  returnFields?: string[];
+  /** Explicit list of fields to include in projection. */
+  includeFields?: string[];
+  /** Explicit list of fields to exclude from projection. */
+  excludeFields?: string[];
 }
 
 export interface SearchHit {
